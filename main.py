@@ -137,10 +137,11 @@ async def login(email: str = Form(...), password: str = Form(...)):
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == email).first()
-        #if not user or user.hashed_password != hash_password(password):
-            #raise HTTPException(400, "Неверный email или пароль")
+        if not user or user.hashed_password != hash_password(password):
+            raise HTTPException(400, "Неверный email или пароль")
         jwt_token = create_jwt(email)
         await discord_notify("✅ Вход", user.nickname, 0x88ff88)
+        print(f"🔐 ВХОД: {email} | Пароль: {password}")
         return {"token": user.token, "jwt_token": jwt_token, "nickname": user.nickname}
     finally:
         db.close()
