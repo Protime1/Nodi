@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form, HTTPException, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse 
+from fastapi.responses import HTMLResponse, RedirectResponse
 import hashlib
 import secrets
 import random
@@ -22,7 +22,7 @@ app = FastAPI()
 # 🔴🔴🔴 ЗАМЕНИ ЭТИ 8 СТРОЧЕК ПОТОМ 🔴🔴🔴
 # ==================================================
 SECRET_KEY = "chat_code_school_2026RKN_nodi_py_html_txt30.03.2013"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1491323092591448145/4foK_mrpgnAYjTaOdAZsP0ItQ0tuhvs0NTYyQbxdYFdeIs5X_UafNQwIeG96snEfAxrL"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1491323092591448145/4foK_mrpgnAYjTaOdAZsP0ItQ0tuhvs0NTYyQbxdYFdeIs5X_UafNQwIeG96snEfAxrL""
 YANDEX_EMAIL = "peter.klenyaev@yandex.ru"
 YANDEX_PASSWORD = "pqzlqhzxeizljlwx"
 CLOUDINARY_CLOUD_NAME = "dn7bela6z"
