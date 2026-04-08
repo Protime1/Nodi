@@ -25,7 +25,7 @@ SECRET_KEY = os.environ.get("nodi_super_secret_2026_stoler")
     #raise Exception("❌ SECRET_KEY не задан в Render Environment Variables")
 
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1491411923135107114/s2YrafULqGZ8NVIQ-67W-eWdOXIAEf0Pe4ubom7T-P3McEfAYSatkk8Rn_crs74s2KAr")
-YANDEX_EMAIL = os.environ.get("YANDEX_EMAIL", "petr.klenaev@gmail.com")
+YANDEX_EMAIL = os.environ.get("YANDEX_EMAIL", "petr.klenaev@yandex.ru")
 YANDEX_PASSWORD = os.environ.get("YANDEX_PASSWORD", "dzqstoalzkfratxz")
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "dn7bela6z")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "955743566196878")
