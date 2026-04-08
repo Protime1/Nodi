@@ -1,3 +1,9 @@
 fastapi
 uvicorn[standard]
+httpx
 python-multipart
+python-jose[cryptography]
+sqlalchemy
+psycopg2-binary
+email-validator
+cloudinary
