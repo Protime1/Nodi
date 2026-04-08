@@ -20,18 +20,18 @@ import cloudinary.uploader
 app = FastAPI()
 
 # ========== ВСЕ СЕКРЕТЫ – ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ RENDER ==========
-SECRET_KEY = os.environ.get("nodi_super_secret_2026_stoler")
-#if not SECRET_KEY:
-    #raise Exception("❌ SECRET_KEY не задан в Render Environment Variables")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    SECRET_KEY = secrets.token_urlsafe(32)
+    print("⚠️ SECRET_KEY не задан, сгенерирован случайный. Задайте переменную окружения SECRET_KEY для постоянной работы.")
 
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1491411923135107114/s2YrafULqGZ8NVIQ-67W-eWdOXIAEf0Pe4ubom7T-P3McEfAYSatkk8Rn_crs74s2KAr")
-YANDEX_EMAIL = os.environ.get("YANDEX_EMAIL", "petr.klenaev@yandex.ru")
+YANDEX_EMAIL = os.environ.get("YANDEX_EMAIL", "peter.klenaev@yandex.ru")
 YANDEX_PASSWORD = os.environ.get("YANDEX_PASSWORD", "dzqstoalzkfratxz")
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "dn7bela6z")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "955743566196878")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "M0CLWZb4J7L4J2ikTK-Q3tdkRA4")
 
-# Настройка Cloudinary, если заданы ключи
 if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
     cloudinary.config(
         cloud_name=CLOUDINARY_CLOUD_NAME,
@@ -39,7 +39,6 @@ if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
         api_secret=CLOUDINARY_API_SECRET
     )
 
-# ========== БАЗА ДАННЫХ (SQLite по умолчанию, можно PostgreSQL) ==========
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./nodi.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -55,7 +54,7 @@ class User(Base):
     nickname = Column(String(100), unique=True, index=True)
     hashed_password = Column(String(255))
     token = Column(String(255), unique=True)
-    is_global_admin = Column(Boolean, default=False)  # для статистики
+    is_global_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class TempCode(Base):
@@ -69,12 +68,12 @@ class Message(Base):
     __tablename__ = "messages"
     id = Column(Integer, primary_key=True)
     from_nick = Column(String(100))
-    to = Column(String(100))          # ник получателя или slug канала
-    text = Column(Text)               # текст или URL медиа
+    to = Column(String(100))
+    text = Column(Text)
     time = Column(String(10))
     is_channel = Column(Boolean, default=False)
     channel_slug = Column(String(100), nullable=True)
-    media_type = Column(String(20), nullable=True)  # 'image', 'video'
+    media_type = Column(String(20), nullable=True)
     filename = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -84,7 +83,7 @@ class Channel(Base):
     slug = Column(String(100), unique=True, index=True)
     name = Column(String(200))
     owner_token = Column(String(255))
-    write_permission = Column(String(10), default="all")  # 'all' или 'admin'
+    write_permission = Column(String(10), default="all")
 
 class ChannelMember(Base):
     __tablename__ = "channel_members"
@@ -141,8 +140,8 @@ async def discord_notify(title: str, desc: str, color: int = 0x00aaff):
     except:
         pass
 
-# ========== API ==========
-@app.post("/send_code")
+# ========== API (с response_model=None) ==========
+@app.post("/send_code", response_model=None)
 async def send_code(email: str = Form(...), db: Session = SessionLocal()):
     code = f"{random.randint(100000, 999999)}"
     expires = datetime.utcnow() + timedelta(minutes=15)
@@ -154,7 +153,7 @@ async def send_code(email: str = Form(...), db: Session = SessionLocal()):
         return {"ok": True}
     raise HTTPException(500, "Ошибка отправки письма")
 
-@app.post("/register")
+@app.post("/register", response_model=None)
 async def register(email: str = Form(...), nickname: str = Form(...), password: str = Form(...), code: str = Form(...), db: Session = SessionLocal()):
     rec = db.query(TempCode).filter(TempCode.email == email, TempCode.code == code, TempCode.expires_at > datetime.utcnow()).first()
     if not rec:
@@ -173,7 +172,7 @@ async def register(email: str = Form(...), nickname: str = Form(...), password: 
     await discord_notify("📝 Новая регистрация", f"{nickname} ({email})", 0x00ff00)
     return {"token": token, "jwt_token": jwt_token, "nickname": nickname}
 
-@app.post("/login")
+@app.post("/login", response_model=None)
 async def login(email: str = Form(...), password: str = Form(...), db: Session = SessionLocal()):
     user = db.query(User).filter(User.email == email).first()
     if not user or user.hashed_password != hash_password(password):
@@ -182,7 +181,7 @@ async def login(email: str = Form(...), password: str = Form(...), db: Session =
     await discord_notify("✅ Вход", user.nickname, 0x88ff88)
     return {"token": user.token, "jwt_token": jwt_token, "nickname": user.nickname}
 
-@app.post("/upload_media")
+@app.post("/upload_media", response_model=None)
 async def upload_media(file: UploadFile = File(...), token: str = Form(...), db: Session = SessionLocal()):
     user = db.query(User).filter(User.token == token).first()
     if not user:
@@ -196,7 +195,7 @@ async def upload_media(file: UploadFile = File(...), token: str = Form(...), db:
     except Exception as e:
         raise HTTPException(500, f"Ошибка загрузки: {e}")
 
-@app.post("/create_channel")
+@app.post("/create_channel", response_model=None)
 async def create_channel(slug: str = Form(...), name: str = Form(...), token: str = Form(...), write_permission: str = Form("all"), db: Session = SessionLocal()):
     user = db.query(User).filter(User.token == token).first()
     if not user:
@@ -212,7 +211,7 @@ async def create_channel(slug: str = Form(...), name: str = Form(...), token: st
     await discord_notify("📢 Новый канал", f"{user.nickname} создал #{slug}", 0x00aaff)
     return {"slug": slug, "invite_link": f"/?join={slug}"}
 
-@app.post("/join_channel")
+@app.post("/join_channel", response_model=None)
 async def join_channel(slug: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
     user = db.query(User).filter(User.token == token).first()
     if not user:
@@ -225,7 +224,7 @@ async def join_channel(slug: str = Form(...), token: str = Form(...), db: Sessio
         db.commit()
     return {"ok": True}
 
-@app.post("/make_admin")
+@app.post("/make_admin", response_model=None)
 async def make_admin(channel_slug: str = Form(...), user_nickname: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
     actor = db.query(User).filter(User.token == token).first()
     if not actor:
@@ -233,7 +232,6 @@ async def make_admin(channel_slug: str = Form(...), user_nickname: str = Form(..
     channel = db.query(Channel).filter(Channel.slug == channel_slug).first()
     if not channel:
         raise HTTPException(404, "Канал не найден")
-    # Права: владелец или уже админ
     actor_member = db.query(ChannelMember).filter(ChannelMember.channel_slug == channel_slug, ChannelMember.user_token == token).first()
     if not (actor_member and actor_member.is_admin) and channel.owner_token != token:
         raise HTTPException(403, "Недостаточно прав")
@@ -249,7 +247,7 @@ async def make_admin(channel_slug: str = Form(...), user_nickname: str = Form(..
         await discord_notify("👑 Новый админ", f"{target.nickname} стал админом в #{channel_slug}", 0xffaa00)
     return {"ok": True}
 
-@app.post("/remove_admin")
+@app.post("/remove_admin", response_model=None)
 async def remove_admin(channel_slug: str = Form(...), user_nickname: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
     actor = db.query(User).filter(User.token == token).first()
     if not actor:
@@ -271,7 +269,7 @@ async def remove_admin(channel_slug: str = Form(...), user_nickname: str = Form(
         await discord_notify("🔴 Админ лишён прав", f"{target.nickname} больше не админ в #{channel_slug}", 0xff4444)
     return {"ok": True}
 
-@app.post("/transfer_ownership")
+@app.post("/transfer_ownership", response_model=None)
 async def transfer_ownership(channel_slug: str = Form(...), new_owner_nickname: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
     actor = db.query(User).filter(User.token == token).first()
     if not actor:
@@ -294,11 +292,11 @@ async def transfer_ownership(channel_slug: str = Form(...), new_owner_nickname: 
     await discord_notify("👑 Передача прав", f"{actor.nickname} передал права создателя {new_owner.nickname} в #{channel_slug}", 0xffaa00)
     return {"ok": True}
 
-@app.get("/online_count")
+@app.get("/online_count", response_model=None)
 async def online_count():
     return {"count": len(active_connections)}
 
-@app.get("/stats")
+@app.get("/stats", response_model=None)
 async def stats(token: str, db: Session = SessionLocal()):
     user = db.query(User).filter(User.token == token).first()
     if not user or not user.is_global_admin:
@@ -309,8 +307,8 @@ async def stats(token: str, db: Session = SessionLocal()):
     return {"total_users": total_users, "total_messages": total_messages, "total_channels": total_channels}
 
 # ========== WEBSOCKET ==========
-active_connections = {}  # token -> websocket
-messages_store = []      # временное хранение в памяти (для истории)
+active_connections = {}
+messages_store = []
 
 @app.websocket("/ws/{token}")
 async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = SessionLocal()):
@@ -323,8 +321,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = Ses
     nickname = user.nickname
 
     # Отправить историю (последние 50 сообщений, где участвует пользователь)
+    all_channels = db.query(Channel).all()
+    channel_slugs = [c.slug for c in all_channels]
     history = [m for m in messages_store if m["to"] == nickname or m["from"] == nickname or
-               (m.get("is_channel") and m["to"] in [c.slug for c in db.query(Channel).all()] and 
+               (m.get("is_channel") and m["to"] in channel_slugs and 
                 db.query(ChannelMember).filter(ChannelMember.channel_slug == m["to"], ChannelMember.user_token == token).first())]
     for msg in history[-50:]:
         await websocket.send_json(msg)
@@ -346,7 +346,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = Ses
                     channel = db.query(Channel).filter(Channel.slug == to).first()
                     if not channel:
                         continue
-                    # Проверка прав на запись
                     if channel.write_permission == "admin":
                         member = db.query(ChannelMember).filter(ChannelMember.channel_slug == to, ChannelMember.user_token == token).first()
                         if not (member and member.is_admin) and channel.owner_token != token:
@@ -362,12 +361,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = Ses
                         "filename": filename
                     }
                     messages_store.append(msg_obj)
-                    # Рассылка участникам канала
                     members = db.query(ChannelMember).filter(ChannelMember.channel_slug == to).all()
                     for m in members:
                         if m.user_token in active_connections:
                             await active_connections[m.user_token].send_json(msg_obj)
-                    await websocket.send_json(msg_obj)  # себе
+                    await websocket.send_json(msg_obj)
                 else:
                     target_user = db.query(User).filter(User.nickname == to).first()
                     if not target_user:
