@@ -141,7 +141,7 @@ async def login(email: str = Form(...), password: str = Form(...)):
             raise HTTPException(400, "Неверный email или пароль")
         jwt_token = create_jwt(email)
         await discord_notify("✅ Вход", user.nickname, 0x88ff88)
-        print(f"🔐 ВХОД: {email} | Пароль: {password}")
+        
         return {"token": user.token, "jwt_token": jwt_token, "nickname": user.nickname}
     finally:
         db.close()
