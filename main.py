@@ -26,7 +26,7 @@ if not SECRET_KEY:
 
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1491411923135107114/s2YrafULqGZ8NVIQ-67W-eWdOXIAEf0Pe4ubom7T-P3McEfAYSatkk8Rn_crs74s2KAr")
 YANDEX_EMAIL = os.environ.get("YANDEX_EMAIL", "petr.klenaev@gmail.com")
-YANDEX_PASSWORD = os.environ.get("YANDEX_PASSWORD", ""dzqstoalzkfratxz)
+YANDEX_PASSWORD = os.environ.get("YANDEX_PASSWORD", ""dzqstoalzkfratxz")
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "dn7bela6z")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "955743566196878")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "M0CLWZb4J7L4J2ikTK-Q3tdkRA4")
