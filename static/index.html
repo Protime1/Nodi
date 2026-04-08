@@ -1,100 +1,253 @@
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Nodi</title><style>body{font-family:sans-serif;margin:0;padding:20px;background:#eee}#auth,#chat{max-width:600px;margin:auto;background:white;padding:20px;border-radius:10px}input,button{margin:5px;padding:8px}#messages{height:400px;overflow:auto;border:1px solid #ccc;padding:10px}.msg{margin:5px}.my{text-align:right;color:blue}</style></head>
-<body>
-<div id="auth">
-    <h2>Nodi</h2>
-    <div id="step1">
-        <input type="email" id="email" placeholder="Email"><br>
-        <button onclick="sendCode()">Получить код</button>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nodi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body.dark { background:#1a1a1a; color:#e0e0e0; }
+        body.dark .bg-white { background:#2d2d2d !important; }
+        body.dark .bg-gray-50 { background:#252525 !important; }
+        body.dark .border { border-color:#404040 !important; }
+        body.dark input { background:#3a3a3a; color:#e0e0e0; border-color:#505050; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+<div id="authScreen" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <h1 class="text-3xl font-bold text-center mb-6">Nodi</h1>
+        <div class="space-y-3">
+            <input type="email" id="regEmail" placeholder="Email" class="w-full border rounded-xl p-3">
+            <input type="text" id="regNick" placeholder="Никнейм" class="w-full border rounded-xl p-3">
+            <input type="password" id="regPass" placeholder="Пароль (мин. 4)" class="w-full border rounded-xl p-3">
+            <button onclick="register()" class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold">Зарегистрироваться</button>
+        </div>
+        <div class="h-px bg-gray-200 my-4"></div>
+        <div class="space-y-3">
+            <input type="email" id="loginEmail" placeholder="Email" class="w-full border rounded-xl p-3">
+            <input type="password" id="loginPass" placeholder="Пароль" class="w-full border rounded-xl p-3">
+            <button onclick="login()" class="w-full bg-black text-white py-3 rounded-xl font-semibold">Войти</button>
+        </div>
+        <div id="errorMsg" class="text-red-500 text-center mt-3 text-sm"></div>
     </div>
-    <div id="step2" style="display:none">
-        <input type="text" id="code" placeholder="Код из лога Render"><br>
-        <input type="text" id="nick" placeholder="Никнейм"><br>
-        <input type="password" id="pass" placeholder="Пароль"><br>
-        <button onclick="register()">Зарегистрироваться</button>
-        <button onclick="back()">Назад</button>
-    </div>
-    <hr>
-    <div>
-        <input type="email" id="loginEmail" placeholder="Email"><br>
-        <input type="password" id="loginPass" placeholder="Пароль"><br>
-        <button onclick="login()">Войти</button>
-    </div>
-    <div id="error" style="color:red"></div>
 </div>
-<div id="chat" style="display:none">
-    <h3>Чат: <span id="myNick"></span> <button onclick="logout()">Выйти</button></h3>
-    <input type="text" id="target" placeholder="Кому (никнейм)">
-    <div id="messages"></div>
-    <input type="text" id="msgInput" placeholder="Сообщение" style="width:70%"><button onclick="send()">Отправить</button>
+
+<div id="chatScreen" class="hidden h-screen flex flex-col">
+    <div class="bg-white border-b p-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <span class="text-xl font-bold">Nodi</span>
+            <span id="onlineCount" class="text-sm text-gray-500">⚫</span>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="toggleTheme()" class="text-xl">🌙</button>
+            <button onclick="showCreateChannel()" class="bg-gray-200 px-3 py-1 rounded-full text-sm">➕ Канал</button>
+            <button id="adminBtn" onclick="showStats()" class="hidden bg-yellow-200 px-3 py-1 rounded-full text-sm">📊 Статистика</button>
+            <button onclick="logout()" class="bg-gray-200 px-3 py-1 rounded-full text-sm">🚪 Выйти</button>
+        </div>
+    </div>
+    <div class="flex flex-1 overflow-hidden">
+        <div class="w-64 bg-gray-50 border-r p-3 flex flex-col overflow-y-auto">
+            <div class="mb-4 p-2 bg-gray-100 rounded-lg">
+                <div class="font-medium" id="myNick"></div>
+                <div class="text-xs text-green-600">● В сети</div>
+            </div>
+            <input type="text" id="targetUser" placeholder="Кому (ник)" class="w-full border rounded-lg p-2 text-sm mb-2">
+            <label class="flex items-center gap-2 text-sm mb-3"><input type="checkbox" id="isChannel"> Канал</label>
+            <div id="channelCreate" class="hidden mb-3">
+                <input type="text" id="channelSlug" placeholder="slug (англ)" class="w-full border rounded-lg p-2 text-sm mb-2">
+                <input type="text" id="channelName" placeholder="Название" class="w-full border rounded-lg p-2 text-sm mb-2">
+                <select id="channelWritePermission" class="w-full border rounded-lg p-2 text-sm mb-2">
+                    <option value="all">✍️ Все могут писать</option>
+                    <option value="admin">👑 Только админы</option>
+                </select>
+                <button onclick="createChannel()" class="bg-black text-white py-1 rounded-lg text-sm w-full">Создать</button>
+            </div>
+            <div class="text-xs text-gray-400 mt-auto pt-3">
+                <p>📷 <button onclick="sendImage()" class="text-blue-500">Отправить фото/видео</button></p>
+                <p>👑 Админы назначаются владельцем</p>
+            </div>
+        </div>
+        <div class="flex-1 flex flex-col">
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+            <div class="p-4 border-t flex gap-2">
+                <input type="text" id="messageInput" placeholder="Сообщение..." class="flex-1 border rounded-full px-4 py-2" onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()" class="bg-black text-white px-6 rounded-full">➤</button>
+            </div>
+        </div>
+    </div>
 </div>
+
+<div id="statsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full">
+        <h3 class="text-xl font-bold mb-3">Статистика сервера</h3>
+        <div id="statsContent"></div>
+        <button onclick="closeStats()" class="mt-4 bg-gray-300 px-4 py-2 rounded">Закрыть</button>
+    </div>
+</div>
+
+<input type="file" id="imageInput" accept="image/*,video/*" class="hidden">
+
 <script>
-let token=null, nick=null, ws=null, pendingEmail=null;
-function showError(msg){document.getElementById('error').innerText=msg;setTimeout(()=>document.getElementById('error').innerText='',3000);}
-async function sendCode(){
-    let email=document.getElementById('email').value;
-    if(!email)return showError('Введите email');
-    pendingEmail=email;
-    let fd=new FormData(); fd.append('email',email);
-    let res=await fetch('/send_code',{method:'POST',body:fd});
-    if(res.ok){
-        document.getElementById('step1').style.display='none';
-        document.getElementById('step2').style.display='block';
-        showError('Код отправлен, найди его в логах Render');
-    }else showError('Ошибка');
+let token=null, nick=null, email=null, ws=null;
+
+function toggleTheme(){
+    document.body.classList.toggle('dark');
+    localStorage.setItem('theme',document.body.classList.contains('dark')?'dark':'light');
 }
+if(localStorage.getItem('theme')==='dark') toggleTheme();
+
 async function register(){
-    let code=document.getElementById('code').value;
-    let nickInput=document.getElementById('nick').value;
-    let passInput=document.getElementById('pass').value;
+    let email=document.getElementById('regEmail').value;
+    let nn=document.getElementById('regNick').value;
+    let pw=document.getElementById('regPass').value;
     let fd=new FormData();
-    fd.append('email',pendingEmail); fd.append('nick',nickInput); fd.append('password',passInput); fd.append('code',code);
-    let res=await fetch('/register',{method:'POST',body:fd});
-    let data=await res.json();
-    if(res.ok){
-        token=data.token; nick=data.nick;
+    fd.append('email',email); fd.append('nickname',nn); fd.append('password',pw);
+    let r=await fetch('/register',{method:'POST',body:fd});
+    let d=await r.json();
+    if(r.ok){
+        token=d.token; nick=d.nickname;
         localStorage.setItem('token',token); localStorage.setItem('nick',nick);
         startChat();
-    }else showError(data.detail);
+    }else alert(d.detail);
 }
+
 async function login(){
     let email=document.getElementById('loginEmail').value;
-    let pass=document.getElementById('loginPass').value;
-    let fd=new FormData(); fd.append('email',email); fd.append('password',pass);
-    let res=await fetch('/login',{method:'POST',body:fd});
-    let data=await res.json();
-    if(res.ok){
-        token=data.token; nick=data.nick;
+    let pw=document.getElementById('loginPass').value;
+    let fd=new FormData(); fd.append('email',email); fd.append('password',pw);
+    let r=await fetch('/login',{method:'POST',body:fd});
+    let d=await r.json();
+    if(r.ok){
+        token=d.token; nick=d.nickname;
         localStorage.setItem('token',token); localStorage.setItem('nick',nick);
         startChat();
-    }else showError(data.detail);
+    }else alert(d.detail);
 }
-function startChat(){
-    document.getElementById('auth').style.display='none';
-    document.getElementById('chat').style.display='block';
+
+async function startChat(){
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('chatScreen').style.display='flex';
     document.getElementById('myNick').innerText=nick;
+    connectWS();
+    updateOnlineCount();
+    setInterval(updateOnlineCount,10000);
+    // проверить, глобальный ли админ
+    let r=await fetch(`/stats?token=${token}`);
+    if(r.ok) document.getElementById('adminBtn').classList.remove('hidden');
+}
+
+async function updateOnlineCount(){
+    let r=await fetch('/online_count');
+    let d=await r.json();
+    document.getElementById('onlineCount').innerText=`🟢 ${d.count} онлайн`;
+}
+
+function connectWS(){
     let proto=location.protocol==='https:'?'wss':'ws';
     ws=new WebSocket(`${proto}://${location.host}/ws/${token}`);
     ws.onmessage=e=>{
         let msg=JSON.parse(e.data);
-        let div=document.createElement('div');
-        div.className=`msg ${msg.from===nick?'my':'other'}`;
-        div.innerHTML=`<b>${msg.from}</b> [${msg.time}]: ${msg.text}`;
-        document.getElementById('messages').appendChild(div);
+        addMessage(msg.from,msg.text,msg.time,msg.from===nick,msg.is_channel?msg.to:null,msg.media_type,msg.filename);
+    };
+    ws.onclose=()=>setTimeout(connectWS,3000);
+}
+
+function addMessage(sender,text,time,isMe,channel,mediaType,filename){
+    let container=document.getElementById('messages');
+    let div=document.createElement('div');
+    div.className=`flex ${isMe?'justify-end':'justify-start'} mb-2`;
+    let prefix=channel?`📢 ${sender}`:sender;
+    let contentHtml='';
+    if(mediaType==='image') contentHtml=`<img src="${text}" class="rounded-lg max-h-64 mt-1">`;
+    else if(mediaType==='video') contentHtml=`<video src="${text}" controls class="rounded-lg max-h-64 mt-1"></video>`;
+    else contentHtml=`<div>${escapeHtml(text)}</div>`;
+    if(filename && mediaType) contentHtml+=`<div class="text-[10px] opacity-50 mt-1">${mediaType==='image'?'📷':'🎥'} ${escapeHtml(filename)}</div>`;
+    div.innerHTML=`<div class="${isMe?'bg-gray-800 text-white':'bg-gray-200'} rounded-2xl px-4 py-2 max-w-xs"><div class="text-xs opacity-75">${escapeHtml(prefix)}</div>${contentHtml}<div class="text-[10px] text-right mt-1">${time}</div></div>`;
+    container.appendChild(div);
+    container.scrollTop=container.scrollHeight;
+}
+
+function sendMessage(){
+    let text=document.getElementById('messageInput').value;
+    let target=document.getElementById('targetUser').value;
+    let isChan=document.getElementById('isChannel').checked;
+    if(!text.trim()||!target.trim()) return;
+    ws.send(JSON.stringify({type:'message',to:target,text:text,is_channel:isChan}));
+    document.getElementById('messageInput').value='';
+}
+
+async function sendImage(){
+    let fileInput=document.getElementById('imageInput');
+    fileInput.click();
+    fileInput.onchange=async (e)=>{
+        let file=e.target.files[0];
+        if(!file) return;
+        let target=document.getElementById('targetUser').value;
+        let isChan=document.getElementById('isChannel').checked;
+        if(!target.trim()){alert('Укажите получателя');return;}
+        let fd=new FormData(); fd.append('file',file); fd.append('token',token);
+        let r=await fetch('/upload_media',{method:'POST',body:fd});
+        let data=await r.json();
+        if(r.ok){
+            ws.send(JSON.stringify({type:'message',to:target,text:'',media_url:data.url,media_type:data.type,filename:data.filename,is_channel:isChan}));
+        }else alert(data.detail);
+        fileInput.value='';
     };
 }
-function send(){
-    let text=document.getElementById('msgInput').value;
-    let to=document.getElementById('target').value;
-    if(!text||!to)return;
-    ws.send(JSON.stringify({to,text}));
-    document.getElementById('msgInput').value='';
+
+function showCreateChannel(){
+    document.getElementById('channelCreate').classList.toggle('hidden');
 }
-function logout(){localStorage.clear();if(ws)ws.close();location.reload();}
-function back(){document.getElementById('step2').style.display='none';document.getElementById('step1').style.display='block';}
+
+async function createChannel(){
+    let slug=document.getElementById('channelSlug').value;
+    let name=document.getElementById('channelName').value;
+    let perm=document.getElementById('channelWritePermission').value;
+    let fd=new FormData(); fd.append('slug',slug); fd.append('name',name); fd.append('token',token); fd.append('write_permission',perm);
+    let r=await fetch('/create_channel',{method:'POST',body:fd});
+    let d=await r.json();
+    if(r.ok){
+        alert(`Канал создан! Ссылка: ${location.origin}/?join=${d.slug}`);
+        document.getElementById('channelCreate').classList.add('hidden');
+    }else alert(d.detail);
+}
+
+async function showStats(){
+    let r=await fetch(`/stats?token=${token}`);
+    if(r.ok){
+        let d=await r.json();
+        document.getElementById('statsContent').innerHTML=`
+            <p>👥 Пользователей: ${d.total_users}</p>
+            <p>💬 Сообщений: ${d.total_messages}</p>
+            <p>📢 Каналов: ${d.total_channels}</p>
+        `;
+        document.getElementById('statsModal').classList.remove('hidden');
+    }else alert('Нет прав');
+}
+
+function closeStats(){
+    document.getElementById('statsModal').classList.add('hidden');
+}
+
+function logout(){
+    localStorage.clear();
+    if(ws) ws.close();
+    location.reload();
+}
+
+function escapeHtml(s){
+    let div=document.createElement('div');
+    div.textContent=s;
+    return div.innerHTML;
+}
+
 let savedToken=localStorage.getItem('token'), savedNick=localStorage.getItem('nick');
-if(savedToken&&savedNick){token=savedToken;nick=savedNick;startChat();}
+if(savedToken && savedNick){
+    token=savedToken; nick=savedNick;
+    startChat();
+}
 </script>
 </body>
 </html>
