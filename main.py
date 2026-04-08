@@ -296,15 +296,13 @@ async def transfer_ownership(channel_slug: str = Form(...), new_owner_nickname: 
 async def online_count():
     return {"count": len(active_connections)}
 
-@app.get("/stats", response_model=None)
+@app.get("/stats")
 async def stats(token: str, db: Session = SessionLocal()):
     user = db.query(User).filter(User.token == token).first()
     if not user or not user.is_global_admin:
-        raise HTTPException(403, "Только глобальный администратор")
+        raise HTTPException(403, "Нет прав")
     total_users = db.query(User).count()
-    total_messages = db.query(Message).count()
-    total_channels = db.query(Channel).count()
-    return {"total_users": total_users, "total_messages": total_messages, "total_channels": total_channels}
+    return {"total_users": total_users}   # ✅ возвращаем словарь, не сессию
 
 # ========== WEBSOCKET ==========
 active_connections = {}
