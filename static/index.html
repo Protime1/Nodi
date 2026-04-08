@@ -1,226 +1,100 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nodi - Мессенджер</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100">
-
-<div id="authScreen" class="min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 class="text-3xl font-bold text-center mb-6">Nodi</h1>
-
-        <!-- Шаг 1: запрос email -->
-        <div id="step1">
-            <input type="email" id="email" placeholder="Email" class="w-full border rounded-xl p-3 mb-3">
-            <button onclick="sendCode()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold">Получить код</button>
-        </div>
-
-        <!-- Шаг 2: ввод кода, ника, пароля -->
-        <div id="step2" style="display:none;">
-            <input type="text" id="code" placeholder="Код из письма" class="w-full border rounded-xl p-3 mb-2">
-            <input type="text" id="nickname" placeholder="Никнейм" class="w-full border rounded-xl p-3 mb-2">
-            <input type="password" id="password" placeholder="Пароль (мин. 4 символа)" class="w-full border rounded-xl p-3 mb-3">
-            <button onclick="register()" class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold">Зарегистрироваться</button>
-            <button onclick="backToStep1()" class="w-full bg-gray-400 text-white py-2 rounded-xl mt-2">Назад</button>
-        </div>
-
-        <div class="h-px bg-gray-200 my-4"></div>
-
-        <!-- Вход -->
-        <div>
-            <input type="email" id="loginEmail" placeholder="Email" class="w-full border rounded-xl p-3 mb-2">
-            <input type="password" id="loginPassword" placeholder="Пароль" class="w-full border rounded-xl p-3 mb-3">
-            <button onclick="login()" class="w-full bg-black text-white py-3 rounded-xl font-semibold">Войти</button>
-        </div>
-
-        <div id="errorMsg" class="text-red-500 text-center mt-3 text-sm"></div>
+<html>
+<head><meta charset="UTF-8"><title>Nodi</title><style>body{font-family:sans-serif;margin:0;padding:20px;background:#eee}#auth,#chat{max-width:600px;margin:auto;background:white;padding:20px;border-radius:10px}input,button{margin:5px;padding:8px}#messages{height:400px;overflow:auto;border:1px solid #ccc;padding:10px}.msg{margin:5px}.my{text-align:right;color:blue}</style></head>
+<body>
+<div id="auth">
+    <h2>Nodi</h2>
+    <div id="step1">
+        <input type="email" id="email" placeholder="Email"><br>
+        <button onclick="sendCode()">Получить код</button>
     </div>
+    <div id="step2" style="display:none">
+        <input type="text" id="code" placeholder="Код из лога Render"><br>
+        <input type="text" id="nick" placeholder="Никнейм"><br>
+        <input type="password" id="pass" placeholder="Пароль"><br>
+        <button onclick="register()">Зарегистрироваться</button>
+        <button onclick="back()">Назад</button>
+    </div>
+    <hr>
+    <div>
+        <input type="email" id="loginEmail" placeholder="Email"><br>
+        <input type="password" id="loginPass" placeholder="Пароль"><br>
+        <button onclick="login()">Войти</button>
+    </div>
+    <div id="error" style="color:red"></div>
 </div>
-
-<div id="chatScreen" style="display:none;" class="h-screen flex flex-col">
-    <div class="bg-white border-b p-4">
-        <h2 class="text-xl font-bold">Чат: <span id="myNick"></span></h2>
-    </div>
-    <div class="flex-1 overflow-y-auto p-4" id="messages"></div>
-    <div class="p-4 border-t flex gap-2">
-        <input type="text" id="target" placeholder="Кому (ник)" class="flex-1 border rounded-full px-4 py-2">
-        <label class="flex items-center gap-1"><input type="checkbox" id="isChannel"> Канал</label>
-        <input type="text" id="msgInput" placeholder="Сообщение" class="flex-1 border rounded-full px-4 py-2">
-        <button onclick="sendMessage()" class="bg-blue-600 text-white px-6 rounded-full">➤</button>
-    </div>
-    <div class="p-2 text-center">
-        <button onclick="showCreateChannel()" class="bg-gray-200 px-3 py-1 rounded-full text-sm">➕ Создать канал</button>
-        <div id="channelCreate" style="display:none; margin-top:10px;">
-            <input type="text" id="channelSlug" placeholder="slug (англ)" class="border rounded p-1 text-sm">
-            <input type="text" id="channelName" placeholder="Название" class="border rounded p-1 text-sm">
-            <button onclick="createChannel()" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Создать</button>
-        </div>
-        <button onclick="logout()" class="bg-red-500 text-white px-3 py-1 rounded-full text-sm ml-2">Выйти</button>
-    </div>
+<div id="chat" style="display:none">
+    <h3>Чат: <span id="myNick"></span> <button onclick="logout()">Выйти</button></h3>
+    <input type="text" id="target" placeholder="Кому (никнейм)">
+    <div id="messages"></div>
+    <input type="text" id="msgInput" placeholder="Сообщение" style="width:70%"><button onclick="send()">Отправить</button>
 </div>
-
 <script>
-let token = null;
-let nickname = null;
-let ws = null;
-let pendingEmail = null;
-
-function showError(msg) {
-    let errDiv = document.getElementById('errorMsg');
-    errDiv.innerText = msg;
-    setTimeout(() => errDiv.innerText = '', 3000);
+let token=null, nick=null, ws=null, pendingEmail=null;
+function showError(msg){document.getElementById('error').innerText=msg;setTimeout(()=>document.getElementById('error').innerText='',3000);}
+async function sendCode(){
+    let email=document.getElementById('email').value;
+    if(!email)return showError('Введите email');
+    pendingEmail=email;
+    let fd=new FormData(); fd.append('email',email);
+    let res=await fetch('/send_code',{method:'POST',body:fd});
+    if(res.ok){
+        document.getElementById('step1').style.display='none';
+        document.getElementById('step2').style.display='block';
+        showError('Код отправлен, найди его в логах Render');
+    }else showError('Ошибка');
 }
-
-async function sendCode() {
-    const email = document.getElementById('email').value;
-    if (!email) {
-        showError('Введите email');
-        return;
-    }
-    pendingEmail = email;
-    const fd = new FormData();
-    fd.append('email', email);
-    const res = await fetch('/send_code', { method: 'POST', body: fd });
-    if (res.ok) {
-        document.getElementById('step1').style.display = 'none';
-        document.getElementById('step2').style.display = 'block';
-        showError('Код отправлен на почту (если SMTP не настроен, код в логах Render)');
-    } else {
-        showError('Ошибка отправки кода');
-    }
-}
-
-async function register() {
-    const code = document.getElementById('code').value;
-    const nick = document.getElementById('nickname').value;
-    const pass = document.getElementById('password').value;
-    const fd = new FormData();
-    fd.append('email', pendingEmail);
-    fd.append('nickname', nick);
-    fd.append('password', pass);
-    fd.append('code', code);
-    const res = await fetch('/register', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (res.ok) {
-        token = data.token;
-        nickname = data.nickname;
-        localStorage.setItem('token', token);
-        localStorage.setItem('nick', nickname);
+async function register(){
+    let code=document.getElementById('code').value;
+    let nickInput=document.getElementById('nick').value;
+    let passInput=document.getElementById('pass').value;
+    let fd=new FormData();
+    fd.append('email',pendingEmail); fd.append('nick',nickInput); fd.append('password',passInput); fd.append('code',code);
+    let res=await fetch('/register',{method:'POST',body:fd});
+    let data=await res.json();
+    if(res.ok){
+        token=data.token; nick=data.nick;
+        localStorage.setItem('token',token); localStorage.setItem('nick',nick);
         startChat();
-    } else {
-        showError(data.detail || 'Ошибка регистрации');
-    }
+    }else showError(data.detail);
 }
-
-async function login() {
-    const email = document.getElementById('loginEmail').value;
-    const pass = document.getElementById('loginPassword').value;
-    const fd = new FormData();
-    fd.append('email', email);
-    fd.append('password', pass);
-    const res = await fetch('/login', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (res.ok) {
-        token = data.token;
-        nickname = data.nickname;
-        localStorage.setItem('token', token);
-        localStorage.setItem('nick', nickname);
+async function login(){
+    let email=document.getElementById('loginEmail').value;
+    let pass=document.getElementById('loginPass').value;
+    let fd=new FormData(); fd.append('email',email); fd.append('password',pass);
+    let res=await fetch('/login',{method:'POST',body:fd});
+    let data=await res.json();
+    if(res.ok){
+        token=data.token; nick=data.nick;
+        localStorage.setItem('token',token); localStorage.setItem('nick',nick);
         startChat();
-    } else {
-        showError(data.detail || 'Ошибка входа');
-    }
+    }else showError(data.detail);
 }
-
-function startChat() {
-    document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('chatScreen').style.display = 'flex';
-    document.getElementById('myNick').innerText = nickname;
-    connectWebSocket();
-}
-
-function connectWebSocket() {
-    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${protocol}://${location.host}/ws/${token}`);
-    ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        addMessage(msg.from, msg.text, msg.time, msg.from === nickname);
+function startChat(){
+    document.getElementById('auth').style.display='none';
+    document.getElementById('chat').style.display='block';
+    document.getElementById('myNick').innerText=nick;
+    let proto=location.protocol==='https:'?'wss':'ws';
+    ws=new WebSocket(`${proto}://${location.host}/ws/${token}`);
+    ws.onmessage=e=>{
+        let msg=JSON.parse(e.data);
+        let div=document.createElement('div');
+        div.className=`msg ${msg.from===nick?'my':'other'}`;
+        div.innerHTML=`<b>${msg.from}</b> [${msg.time}]: ${msg.text}`;
+        document.getElementById('messages').appendChild(div);
     };
-    ws.onclose = () => setTimeout(connectWebSocket, 3000);
 }
-
-function addMessage(sender, text, time, isMe) {
-    const container = document.getElementById('messages');
-    const div = document.createElement('div');
-    div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
-    div.innerHTML = `<div class="${isMe ? 'bg-blue-500 text-white' : 'bg-gray-300'} rounded-2xl px-4 py-2 max-w-xs"><div class="text-xs">${sender}</div><div>${escapeHtml(text)}</div><div class="text-right text-[10px]">${time}</div></div>`;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+function send(){
+    let text=document.getElementById('msgInput').value;
+    let to=document.getElementById('target').value;
+    if(!text||!to)return;
+    ws.send(JSON.stringify({to,text}));
+    document.getElementById('msgInput').value='';
 }
-
-function sendMessage() {
-    const text = document.getElementById('msgInput').value;
-    const target = document.getElementById('target').value;
-    const isChannel = document.getElementById('isChannel').checked;
-    if (!text || !target) return;
-    ws.send(JSON.stringify({ type: 'message', to: target, text: text, is_channel: isChannel }));
-    document.getElementById('msgInput').value = '';
-}
-
-function showCreateChannel() {
-    const div = document.getElementById('channelCreate');
-    div.style.display = div.style.display === 'none' ? 'block' : 'none';
-}
-
-async function createChannel() {
-    const slug = document.getElementById('channelSlug').value;
-    const name = document document.getElementById('channelName').value;
-    const fd = new FormData();
-    fd.append('slug', slug);
-    fd.append('name', name);
-    fd.append('token', token);
-    const res = await fetch('/create_channel', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (res.ok) {
-        alert(`Канал создан! Ссылка: ${location.origin}/?join=${data.slug}`);
-        document.getElementById('channelCreate').style.display = 'none';
-    } else {
-        alert(data.detail);
-    }
-}
-
-function logout() {
-    localStorage.clear();
-    if (ws) ws.close();
-    location.reload();
-}
-
-function backToStep1() {
-    document.getElementById('step2').style.display = 'none';
-    document.getElementById('step1').style.display = 'block';
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
-}
-
-// Автовход, если есть токен
-const savedToken = localStorage.getItem('token');
-const savedNick = localStorage.getItem('nick');
-if (savedToken && savedNick) {
-    token = savedToken;
-    nickname = savedNick;
-    startChat();
-}
+function logout(){localStorage.clear();if(ws)ws.close();location.reload();}
+function back(){document.getElementById('step2').style.display='none';document.getElementById('step1').style.display='block';}
+let savedToken=localStorage.getItem('token'), savedNick=localStorage.getItem('nick');
+if(savedToken&&savedNick){token=savedToken;nick=savedNick;startChat();}
 </script>
 </body>
 </html>
-     
