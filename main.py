@@ -1,79 +1,125 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form, HTTPException, Request, UploadFile, File
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse
+import os
 import hashlib
 import secrets
 import random
+import re
 from datetime import datetime, timedelta
-import os
-import httpx
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form, HTTPException, UploadFile, File
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from jose import jwt
 import smtplib
 from email.mime.text import MIMEText
-from jose import jwt
+import httpx
 import cloudinary
 import cloudinary.uploader
-import uuid
-from threading import Thread
-import time
 
 app = FastAPI()
 
-# ==================================================
-# 🔴🔴🔴 ЗАМЕНИ ЭТИ 8 СТРОЧЕК ПОТОМ 🔴🔴🔴
-# ==================================================
-SECRET_KEY = "chat_code_school_2026RKN_nodi_py_html_txt30.03.2013"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1491323092591448145/4foK_mrpgnAYjTaOdAZsP0ItQ0tuhvs0NTYyQbxdYFdeIs5X_UafNQwIeG96snEfAxrL""
-YANDEX_EMAIL = "peter.klenyaev@yandex.ru"
-YANDEX_PASSWORD = "pqzlqhzxeizljlwx"
-CLOUDINARY_CLOUD_NAME = "dn7bela6z"
-CLOUDINARY_API_KEY = "955743566196878"
-CLOUDINARY_API_SECRET = "M0CLWZb4J7L4J2ikTK-Q3tdkRA4"
-# ==================================================
+# ========== ВСЕ СЕКРЕТЫ – ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ RENDER ==========
+SECRET_KEY = os.environ.get("nodi_super_secret_2026_stoler")
+if not SECRET_KEY:
+    raise Exception("❌ SECRET_KEY не задан в Render Environment Variables")
 
-cloudinary.config(
-    cloud_name=CLOUDINARY_CLOUD_NAME,
-    api_key=CLOUDINARY_API_KEY,
-    api_secret=CLOUDINARY_API_SECRET
-)
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1491411923135107114/s2YrafULqGZ8NVIQ-67W-eWdOXIAEf0Pe4ubom7T-P3McEfAYSatkk8Rn_crs74s2KAr")
+YANDEX_EMAIL = os.environ.get("YANDEX_EMAIL", "petr.klenaev@gmail.com")
+YANDEX_PASSWORD = os.environ.get("YANDEX_PASSWORD", ""dzqstoalzkfratxz)
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "dn7bela6z")
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "955743566196878")
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "M0CLWZb4J7L4J2ikTK-Q3tdkRA4")
 
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
+# Настройка Cloudinary, если заданы ключи
+if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET
+    )
 
-def create_token(email: str):
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"sub": email, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+# ========== БАЗА ДАННЫХ (SQLite по умолчанию, можно PostgreSQL) ==========
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./nodi.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-def verify_token(token: str):
+# ========== МОДЕЛИ ==========
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, index=True)
+    nickname = Column(String(100), unique=True, index=True)
+    hashed_password = Column(String(255))
+    token = Column(String(255), unique=True)
+    is_global_admin = Column(Boolean, default=False)  # для статистики
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class TempCode(Base):
+    __tablename__ = "temp_codes"
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), index=True)
+    code = Column(String(6))
+    expires_at = Column(DateTime)
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True)
+    from_nick = Column(String(100))
+    to = Column(String(100))          # ник получателя или slug канала
+    text = Column(Text)               # текст или URL медиа
+    time = Column(String(10))
+    is_channel = Column(Boolean, default=False)
+    channel_slug = Column(String(100), nullable=True)
+    media_type = Column(String(20), nullable=True)  # 'image', 'video'
+    filename = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Channel(Base):
+    __tablename__ = "channels"
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(100), unique=True, index=True)
+    name = Column(String(200))
+    owner_token = Column(String(255))
+    write_permission = Column(String(10), default="all")  # 'all' или 'admin'
+
+class ChannelMember(Base):
+    __tablename__ = "channel_members"
+    id = Column(Integer, primary_key=True)
+    channel_slug = Column(String(100), index=True)
+    user_token = Column(String(255), index=True)
+    is_admin = Column(Boolean, default=False)
+
+Base.metadata.create_all(bind=engine)
+
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+def hash_password(pwd: str) -> str:
+    return hashlib.sha256(pwd.encode()).hexdigest()
+
+def generate_token() -> str:
+    return secrets.token_urlsafe(32)
+
+def create_jwt(email: str) -> str:
+    expire = datetime.utcnow() + timedelta(days=7)
+    return jwt.encode({"sub": email, "exp": expire}, SECRET_KEY, algorithm="HS256")
+
+def verify_jwt(token: str):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         return payload.get("sub")
     except:
         return None
 
-users = {}
-emails = {}
-temp_codes = {}
-messages = []
-channels = {}
-active_connections = {}
-secure_links = {}
-
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def generate_token():
-    return secrets.token_urlsafe(32)
-
-def get_client_ip(request: Request):
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
-
 def send_yandex_email(to_email: str, code: str):
+    if not YANDEX_EMAIL or not YANDEX_PASSWORD:
+        print(f"[EMAIL] {to_email}: код {code} (SMTP не настроен)")
+        return True
     try:
-        msg = MIMEText(f"Ваш код подтверждения для Nodi: {code}\n\nКод действителен 15 минут.", "plain", "utf-8")
-        msg["Subject"] = "Код подтверждения Nodi"
+        msg = MIMEText(f"Ваш код подтверждения Nodi: {code}\nДействителен 15 минут.", "plain", "utf-8")
+        msg["Subject"] = "Код Nodi"
         msg["From"] = YANDEX_EMAIL
         msg["To"] = to_email
         with smtplib.SMTP_SSL("smtp.yandex.ru", 465) as server:
@@ -84,255 +130,266 @@ def send_yandex_email(to_email: str, code: str):
         print(f"Email error: {e}")
         return False
 
-async def send_discord_message(title: str, description: str, color: int = 0x00aaff, fields: list = None):
+async def discord_notify(title: str, desc: str, color: int = 0x00aaff):
     if not DISCORD_WEBHOOK_URL:
         return
-    embed = {"title": title, "description": description, "color": color, "timestamp": datetime.utcnow().isoformat()}
-    if fields:
-        embed["fields"] = fields
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]}, timeout=3)
+            await client.post(DISCORD_WEBHOOK_URL, json={
+                "embeds": [{"title": title, "description": desc, "color": color, "timestamp": datetime.utcnow().isoformat()}]
+            }, timeout=2)
     except:
         pass
 
-async def send_online_count():
-    count = len(active_connections)
-    await send_discord_message(title="📊 Онлайн статистика", description=f"Сейчас в Nodi: **{count}** человек", color=0x88ff88 if count > 0 else 0xffaa00)
-
+# ========== API ==========
 @app.post("/send_code")
-async def send_code(request: Request, email: str = Form(...)):
-    code = str(random.randint(100000, 999999))
+async def send_code(email: str = Form(...), db: Session = SessionLocal()):
+    code = f"{random.randint(100000, 999999)}"
     expires = datetime.utcnow() + timedelta(minutes=15)
-    temp_codes[email] = {"code": code, "expires": expires}
+    db.query(TempCode).filter(TempCode.email == email, TempCode.expires_at < datetime.utcnow()).delete()
+    db.add(TempCode(email=email, code=code, expires_at=expires))
+    db.commit()
     if send_yandex_email(email, code):
-        client_ip = get_client_ip(request)
-        await send_discord_message(title="📧 Код подтверждения отправлен", description=f"Код отправлен на **{email}**", color=0xffaa00, fields=[{"name": "🌐 IP", "value": f"`{client_ip}`", "inline": True}])
-        return {"status": "sent"}
-    else:
-        raise HTTPException(status_code=500, detail="Не удалось отправить письмо")
+        await discord_notify("📧 Код отправлен", email, 0xffaa00)
+        return {"ok": True}
+    raise HTTPException(500, "Ошибка отправки письма")
 
 @app.post("/register")
-async def register(request: Request, email: str = Form(...), nickname: str = Form(...), password: str = Form(...), code: str = Form(...)):
-    if email not in temp_codes:
-        raise HTTPException(status_code=400, detail="Сначала запросите код")
-    code_data = temp_codes[email]
-    if code_data["expires"] < datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Код истёк")
-    if code_data["code"] != code:
-        raise HTTPException(status_code=400, detail="Неверный код")
-    if email in emails:
-        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
-    if len(nickname) < 2:
-        raise HTTPException(status_code=400, detail="Ник слишком короткий")
+async def register(email: str = Form(...), nickname: str = Form(...), password: str = Form(...), code: str = Form(...), db: Session = SessionLocal()):
+    rec = db.query(TempCode).filter(TempCode.email == email, TempCode.code == code, TempCode.expires_at > datetime.utcnow()).first()
+    if not rec:
+        raise HTTPException(400, "Неверный или просроченный код")
+    if db.query(User).filter((User.email == email) | (User.nickname == nickname)).first():
+        raise HTTPException(400, "Email или ник уже заняты")
+    if len(password) < 4:
+        raise HTTPException(400, "Пароль минимум 4 символа")
     token = generate_token()
-    client_ip = get_client_ip(request)
-    jwt_token = create_token(email)
-    users[token] = {"email": email, "nickname": nickname, "ip": client_ip}
-    emails[email] = {"nickname": nickname, "password_hash": hash_password(password)}
-    del temp_codes[email]
-    await send_discord_message(title="📝 Новая регистрация", description=f"**{nickname}** зарегистрировался в Nodi", color=0x00ff00, fields=[{"name": "📧 Email", "value": email, "inline": True}, {"name": "🌐 IP", "value": f"`{client_ip}`", "inline": True}])
-    return {"token": token, "jwt_token": jwt_token, "nickname": nickname, "email": email}
+    is_first = db.query(User).count() == 0
+    user = User(email=email, nickname=nickname, hashed_password=hash_password(password), token=token, is_global_admin=is_first)
+    db.add(user)
+    db.delete(rec)
+    db.commit()
+    jwt_token = create_jwt(email)
+    await discord_notify("📝 Новая регистрация", f"{nickname} ({email})", 0x00ff00)
+    return {"token": token, "jwt_token": jwt_token, "nickname": nickname}
 
 @app.post("/login")
-async def login(request: Request, email: str = Form(...), password: str = Form(...)):
-    if email not in emails:
-        raise HTTPException(status_code=400, detail="Email не найден")
-    if emails[email]["password_hash"] != hash_password(password):
-        client_ip = get_client_ip(request)
-        await send_discord_message(title="⚠️ Неудачная попытка входа", description=f"Попытка входа в **{email}**", color=0xff0000, fields=[{"name": "🌐 IP", "value": f"`{client_ip}`", "inline": True}])
-        raise HTTPException(status_code=400, detail="Неверный пароль")
-    token = None
-    for t, u in users.items():
-        if u["email"] == email:
-            token = t
-            break
-    if not token:
-        raise HTTPException(status_code=400, detail="Ошибка")
-    client_ip = get_client_ip(request)
-    nickname = users[token]["nickname"]
-    users[token]["ip"] = client_ip
-    jwt_token = create_token(email)
-    await send_discord_message(title="✅ Успешный вход", description=f"**{nickname}** вошёл в Nodi", color=0x00aaff, fields=[{"name": "📧 Email", "value": email, "inline": True}, {"name": "🌐 IP", "value": f"`{client_ip}`", "inline": True}])
-    return {"token": token, "jwt_token": jwt_token, "nickname": nickname, "email": email}
+async def login(email: str = Form(...), password: str = Form(...), db: Session = SessionLocal()):
+    user = db.query(User).filter(User.email == email).first()
+    if not user or user.hashed_password != hash_password(password):
+        raise HTTPException(400, "Неверный email или пароль")
+    jwt_token = create_jwt(email)
+    await discord_notify("✅ Вход", user.nickname, 0x88ff88)
+    return {"token": user.token, "jwt_token": jwt_token, "nickname": user.nickname}
 
 @app.post("/upload_media")
-async def upload_media(file: UploadFile = File(...), token: str = Form(...), channel_slug: str = Form(default="")):
-    if token not in users:
-        raise HTTPException(status_code=401, detail="Не авторизован")
+async def upload_media(file: UploadFile = File(...), token: str = Form(...), db: Session = SessionLocal()):
+    user = db.query(User).filter(User.token == token).first()
+    if not user:
+        raise HTTPException(401, "Не авторизован")
+    if not CLOUDINARY_CLOUD_NAME:
+        raise HTTPException(500, "Cloudinary не настроен")
     try:
-        upload_result = cloudinary.uploader.upload(file.file, folder="nodi_messenger", resource_type="auto", quality="auto:good", fetch_format="auto", flags="progressive")
-        cloudinary_url = cloudinary.CloudinaryImage(upload_result["public_id"]).build_url(quality="auto:good", fetch_format="auto")
-        link_id = str(uuid.uuid4()).replace("-", "")[:16]
-        secure_links[link_id] = {"cloudinary_url": cloudinary_url, "channel_slug": channel_slug, "expires": datetime.now() + timedelta(minutes=30), "views": 0}
-        private_url = f"/share/{link_id}"
-        return {"url": private_url, "type": "image" if upload_result["resource_type"] == "image" else "video", "filename": file.filename, "public_id": upload_result["public_id"], "expires_in": 1800}
+        res = cloudinary.uploader.upload(file.file, folder="nodi", resource_type="auto", quality="auto:good")
+        url = cloudinary.CloudinaryImage(res["public_id"]).build_url(quality="auto", fetch_format="auto")
+        return {"url": url, "type": "image" if res["resource_type"] == "image" else "video", "filename": file.filename}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка загрузки: {str(e)}")
-
-@app.get("/share/{link_id}")
-async def get_private_file(link_id: str, token: str = None):
-    if not token or token not in users:
-        raise HTTPException(status_code=401, detail="🔒 Нужно войти в аккаунт")
-    if link_id not in secure_links:
-        raise HTTPException(status_code=404, detail="❌ Ссылка не найдена")
-    link_data = secure_links[link_id]
-    if link_data["expires"] < datetime.now():
-        del secure_links[link_id]
-        raise HTTPException(status_code=410, detail="⏰ Ссылка истекла")
-    channel_slug = link_data["channel_slug"]
-    if channel_slug and channel_slug in channels:
-        if token not in channels[channel_slug]["members"]:
-            raise HTTPException(status_code=403, detail="🚫 Нет доступа к этому файлу")
-    link_data["views"] += 1
-    return RedirectResponse(link_data["cloudinary_url"], headers={"Cache-Control": "public, max-age=2592000, immutable", "CDN-Cache-Control": "public, max-age=2592000", "X-View-Count": str(link_data["views"])})
+        raise HTTPException(500, f"Ошибка загрузки: {e}")
 
 @app.post("/create_channel")
-async def create_channel(slug: str = Form(...), name: str = Form(...), token: str = Form(...), write_permission: str = Form("all")):
-    if token not in users:
-        raise HTTPException(status_code=401, detail="Не авторизован")
-    if slug in channels:
-        raise HTTPException(status_code=400, detail="Канал уже есть")
-    channels[slug] = {"name": name, "owner_token": token, "admins": [token], "members": [token], "write_permission": write_permission}
-    await send_discord_message(title="📢 Новый канал", description=f"**{users[token]['nickname']}** создал канал **{name}**", color=0x00aaff, fields=[{"name": "🔗 Slug", "value": slug, "inline": True}])
+async def create_channel(slug: str = Form(...), name: str = Form(...), token: str = Form(...), write_permission: str = Form("all"), db: Session = SessionLocal()):
+    user = db.query(User).filter(User.token == token).first()
+    if not user:
+        raise HTTPException(401, "Не авторизован")
+    if not re.match(r'^[a-z0-9_-]{3,30}$', slug):
+        raise HTTPException(400, "Slug 3-30 латиница, цифры, -_")
+    if db.query(Channel).filter(Channel.slug == slug).first():
+        raise HTTPException(400, "Канал уже существует")
+    ch = Channel(slug=slug, name=name, owner_token=token, write_permission=write_permission)
+    db.add(ch)
+    db.add(ChannelMember(channel_slug=slug, user_token=token, is_admin=True))
+    db.commit()
+    await discord_notify("📢 Новый канал", f"{user.nickname} создал #{slug}", 0x00aaff)
     return {"slug": slug, "invite_link": f"/?join={slug}"}
 
 @app.post("/join_channel")
-async def join_channel(slug: str = Form(...), token: str = Form(...)):
-    if token not in users:
-        raise HTTPException(status_code=401, detail="Не авторизован")
-    if slug not in channels:
-        raise HTTPException(status_code=404, detail="Канал не найден")
-    if token not in channels[slug]["members"]:
-        channels[slug]["members"].append(token)
-        await send_discord_message(title="👋 Новый участник", description=f"**{users[token]['nickname']}** вступил в канал **{channels[slug]['name']}**", color=0x88ff88)
-    return {"status": "joined"}
-
-@app.post("/get_channel_members")
-async def get_channel_members(slug: str = Form(...), token: str = Form(...)):
-    if token not in users:
-        raise HTTPException(status_code=401, detail="Не авторизован")
-    if slug not in channels:
-        raise HTTPException(status_code=404, detail="Канал не найден")
-    channel = channels[slug]
-    members_list = [{"token": mt, "nickname": users[mt]["nickname"], "email": users[mt]["email"]} for mt in channel["members"]]
-    return {"members": members_list, "admins": channel["admins"], "owner_token": channel["owner_token"], "is_admin": token in channel["admins"], "is_owner": token == channel["owner_token"], "write_permission": channel["write_permission"]}
+async def join_channel(slug: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
+    user = db.query(User).filter(User.token == token).first()
+    if not user:
+        raise HTTPException(401, "Не авторизован")
+    ch = db.query(Channel).filter(Channel.slug == slug).first()
+    if not ch:
+        raise HTTPException(404, "Канал не найден")
+    if not db.query(ChannelMember).filter(ChannelMember.channel_slug == slug, ChannelMember.user_token == token).first():
+        db.add(ChannelMember(channel_slug=slug, user_token=token))
+        db.commit()
+    return {"ok": True}
 
 @app.post("/make_admin")
-async def make_admin(channel_slug: str = Form(...), user_nickname: str = Form(...), token: str = Form(...)):
-    if token not in users or channel_slug not in channels or token not in channels[channel_slug]["admins"]:
-        raise HTTPException(status_code=403, detail="Нет прав")
-    target_token = next((t for t, u in users.items() if u["nickname"] == user_nickname), None)
-    if not target_token or target_token not in channels[channel_slug]["members"]:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    if target_token not in channels[channel_slug]["admins"]:
-        channels[channel_slug]["admins"].append(target_token)
-    return {"status": "ok"}
+async def make_admin(channel_slug: str = Form(...), user_nickname: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
+    actor = db.query(User).filter(User.token == token).first()
+    if not actor:
+        raise HTTPException(401, "Не авторизован")
+    channel = db.query(Channel).filter(Channel.slug == channel_slug).first()
+    if not channel:
+        raise HTTPException(404, "Канал не найден")
+    # Права: владелец или уже админ
+    actor_member = db.query(ChannelMember).filter(ChannelMember.channel_slug == channel_slug, ChannelMember.user_token == token).first()
+    if not (actor_member and actor_member.is_admin) and channel.owner_token != token:
+        raise HTTPException(403, "Недостаточно прав")
+    target = db.query(User).filter(User.nickname == user_nickname).first()
+    if not target:
+        raise HTTPException(404, "Пользователь не найден")
+    member = db.query(ChannelMember).filter(ChannelMember.channel_slug == channel_slug, ChannelMember.user_token == target.token).first()
+    if not member:
+        raise HTTPException(400, "Пользователь не в канале")
+    if not member.is_admin:
+        member.is_admin = True
+        db.commit()
+        await discord_notify("👑 Новый админ", f"{target.nickname} стал админом в #{channel_slug}", 0xffaa00)
+    return {"ok": True}
 
 @app.post("/remove_admin")
-async def remove_admin(channel_slug: str = Form(...), user_nickname: str = Form(...), token: str = Form(...)):
-    if token not in users or channel_slug not in channels or token != channels[channel_slug]["owner_token"]:
-        raise HTTPException(status_code=403, detail="Только создатель")
-    target_token = next((t for t, u in users.items() if u["nickname"] == user_nickname), None)
-    if not target_token or target_token == channels[channel_slug]["owner_token"]:
-        raise HTTPException(status_code=400, detail="Нельзя")
-    if target_token in channels[channel_slug]["admins"]:
-        channels[channel_slug]["admins"].remove(target_token)
-    return {"status": "ok"}
+async def remove_admin(channel_slug: str = Form(...), user_nickname: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
+    actor = db.query(User).filter(User.token == token).first()
+    if not actor:
+        raise HTTPException(401, "Не авторизован")
+    channel = db.query(Channel).filter(Channel.slug == channel_slug).first()
+    if not channel:
+        raise HTTPException(404, "Канал не найден")
+    if channel.owner_token != token:
+        raise HTTPException(403, "Только владелец может убирать админов")
+    target = db.query(User).filter(User.nickname == user_nickname).first()
+    if not target:
+        raise HTTPException(404, "Пользователь не найден")
+    member = db.query(ChannelMember).filter(ChannelMember.channel_slug == channel_slug, ChannelMember.user_token == target.token).first()
+    if not member:
+        raise HTTPException(400, "Пользователь не в канале")
+    if member.is_admin and target.token != channel.owner_token:
+        member.is_admin = False
+        db.commit()
+        await discord_notify("🔴 Админ лишён прав", f"{target.nickname} больше не админ в #{channel_slug}", 0xff4444)
+    return {"ok": True}
 
 @app.post("/transfer_ownership")
-async def transfer_ownership(channel_slug: str = Form(...), new_owner_nickname: str = Form(...), token: str = Form(...)):
-    if token not in users or channel_slug not in channels or token != channels[channel_slug]["owner_token"]:
-        raise HTTPException(status_code=403, detail="Только создатель")
-    new_token = next((t for t, u in users.items() if u["nickname"] == new_owner_nickname), None)
-    if not new_token or new_token not in channels[channel_slug]["admins"]:
-        raise HTTPException(status_code=400, detail="Новый владелец должен быть админом")
-    old_owner = channels[channel_slug]["owner_token"]
-    channels[channel_slug]["owner_token"] = new_token
-    if old_owner not in channels[channel_slug]["admins"]:
-        channels[channel_slug]["admins"].append(old_owner)
-    return {"status": "ok"}
+async def transfer_ownership(channel_slug: str = Form(...), new_owner_nickname: str = Form(...), token: str = Form(...), db: Session = SessionLocal()):
+    actor = db.query(User).filter(User.token == token).first()
+    if not actor:
+        raise HTTPException(401, "Не авторизован")
+    channel = db.query(Channel).filter(Channel.slug == channel_slug).first()
+    if not channel:
+        raise HTTPException(404, "Канал не найден")
+    if channel.owner_token != token:
+        raise HTTPException(403, "Только владелец может передать права")
+    new_owner = db.query(User).filter(User.nickname == new_owner_nickname).first()
+    if not new_owner:
+        raise HTTPException(404, "Пользователь не найден")
+    member = db.query(ChannelMember).filter(ChannelMember.channel_slug == channel_slug, ChannelMember.user_token == new_owner.token).first()
+    if not member:
+        raise HTTPException(400, "Новый владелец должен быть участником канала")
+    if not member.is_admin:
+        member.is_admin = True
+    channel.owner_token = new_owner.token
+    db.commit()
+    await discord_notify("👑 Передача прав", f"{actor.nickname} передал права создателя {new_owner.nickname} в #{channel_slug}", 0xffaa00)
+    return {"ok": True}
 
 @app.get("/online_count")
 async def online_count():
     return {"count": len(active_connections)}
 
-@app.get("/history/{with_email}")
-async def get_history(with_email: str, token: str):
-    if token not in users:
-        raise HTTPException(status_code=401, detail="Не авторизован")
-    user_nick = users[token]["nickname"]
-    result = [msg for msg in messages if not msg.get("channel", False) and ((msg["from_nick"] == user_nick and msg["to"] == with_email) or (msg["from_nick"] == with_email and msg["to"] == user_nick))]
-    return result[-50:]
+@app.get("/stats")
+async def stats(token: str, db: Session = SessionLocal()):
+    user = db.query(User).filter(User.token == token).first()
+    if not user or not user.is_global_admin:
+        raise HTTPException(403, "Только глобальный администратор")
+    total_users = db.query(User).count()
+    total_messages = db.query(Message).count()
+    total_channels = db.query(Channel).count()
+    return {"total_users": total_users, "total_messages": total_messages, "total_channels": total_channels}
+
+# ========== WEBSOCKET ==========
+active_connections = {}  # token -> websocket
+messages_store = []      # временное хранение в памяти (для истории)
 
 @app.websocket("/ws/{token}")
-async def websocket_chat(websocket: WebSocket, token: str):
-    if token not in users:
+async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = SessionLocal()):
+    user = db.query(User).filter(User.token == token).first()
+    if not user:
         await websocket.close(code=1008)
         return
     await websocket.accept()
     active_connections[token] = websocket
-    user_nick = users[token]["nickname"]
-    await send_online_count()
-    user_history = []
-    for msg in messages[-30:]:
-        if not msg.get("channel", False):
-            if msg["from_nick"] == user_nick or msg["to"] == user_nick:
-                user_history.append(msg)
-        else:
-            for slug, chan in channels.items():
-                if token in chan["members"] and msg.get("channel_slug") == slug:
-                    user_history.append(msg)
-                    break
-    await websocket.send_json({"type": "history", "messages": user_history})
+    nickname = user.nickname
+
+    # Отправить историю (последние 50 сообщений, где участвует пользователь)
+    history = [m for m in messages_store if m["to"] == nickname or m["from"] == nickname or
+               (m.get("is_channel") and m["to"] in [c.slug for c in db.query(Channel).all()] and 
+                db.query(ChannelMember).filter(ChannelMember.channel_slug == m["to"], ChannelMember.user_token == token).first())]
+    for msg in history[-50:]:
+        await websocket.send_json(msg)
+
     try:
         while True:
             data = await websocket.receive_json()
             msg_type = data.get("type", "message")
             if msg_type == "message":
                 to = data.get("to", "")
-                text = data.get("text", "")
+                text = data.get("text", "")[:500]
                 is_channel = data.get("is_channel", False)
                 media_url = data.get("media_url", None)
                 media_type = data.get("media_type", None)
                 filename = data.get("filename", None)
                 content = media_url if media_url else text
+
                 if is_channel:
-                    if to in channels:
-                        channel = channels[to]
-                        if channel["write_permission"] == "admin" and token not in channel["admins"]:
-                            await websocket.send_json({"type": "error", "text": "❌ Только админы могут писать"})
+                    channel = db.query(Channel).filter(Channel.slug == to).first()
+                    if not channel:
+                        continue
+                    # Проверка прав на запись
+                    if channel.write_permission == "admin":
+                        member = db.query(ChannelMember).filter(ChannelMember.channel_slug == to, ChannelMember.user_token == token).first()
+                        if not (member and member.is_admin) and channel.owner_token != token:
+                            await websocket.send_json({"type": "error", "text": "Только админы могут писать в этот канал"})
                             continue
-                        new_msg = {"from_token": token, "from_nick": user_nick, "to": to, "text": content, "time": datetime.now().strftime("%H:%M"), "channel": True, "channel_slug": to, "media_type": media_type, "filename": filename, "is_admin": token in channel["admins"], "is_owner": token == channel["owner_token"]}
-                        messages.append(new_msg)
-                        for member_token in channel["members"]:
-                            if member_token in active_connections:
-                                await active_connections[member_token].send_json({"type": "message", "from": user_nick, "text": content, "time": new_msg["time"], "channel": to, "media_type": media_type, "filename": filename, "is_admin": token in channel["admins"], "is_owner": token == channel["owner_token"]})
+                    msg_obj = {
+                        "from": nickname,
+                        "text": content,
+                        "time": datetime.now().strftime("%H:%M"),
+                        "is_channel": True,
+                        "to": to,
+                        "media_type": media_type,
+                        "filename": filename
+                    }
+                    messages_store.append(msg_obj)
+                    # Рассылка участникам канала
+                    members = db.query(ChannelMember).filter(ChannelMember.channel_slug == to).all()
+                    for m in members:
+                        if m.user_token in active_connections:
+                            await active_connections[m.user_token].send_json(msg_obj)
+                    await websocket.send_json(msg_obj)  # себе
                 else:
-                    new_msg = {"from_token": token, "from_nick": user_nick, "to": to, "text": content, "time": datetime.now().strftime("%H:%M"), "channel": False, "media_type": media_type, "filename": filename}
-                    messages.append(new_msg)
-                    target_token = next((t for t, u in users.items() if u["nickname"] == to or u["email"] == to), None)
-                    if target_token and target_token in active_connections:
-                        await active_connections[target_token].send_json({"type": "message", "from": user_nick, "text": content, "time": new_msg["time"], "media_type": media_type, "filename": filename})
-                    await websocket.send_json({"type": "sent", "to": to, "text": content})
+                    target_user = db.query(User).filter(User.nickname == to).first()
+                    if not target_user:
+                        continue
+                    msg_obj = {
+                        "from": nickname,
+                        "text": content,
+                        "time": datetime.now().strftime("%H:%M"),
+                        "is_channel": False,
+                        "to": to,
+                        "media_type": media_type,
+                        "filename": filename
+                    }
+                    messages_store.append(msg_obj)
+                    if target_user.token in active_connections:
+                        await active_connections[target_user.token].send_json(msg_obj)
+                    await websocket.send_json(msg_obj)
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
-        if token in active_connections:
-            del active_connections[token]
-        await send_online_count()
+        active_connections.pop(token, None)
 
+# ========== СТАТИКА ==========
 os.makedirs("static", exist_ok=True)
-
-@app.get("/")
-async def get_index():
-    with open("static/index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
-
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
-
-@app.on_event("startup")
-async def startup_event():
-    thread = Thread(target=lambda: [time.sleep(3600) or None for _ in range(1000000)], daemon=True)
-    thread.start()
-    print("[STARTUP] Nodi запущен!")
