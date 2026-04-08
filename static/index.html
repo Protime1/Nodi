@@ -6,12 +6,11 @@
     <title>Nodi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body.dark { background-color: #1a1a1a; color: #e0e0e0; }
-        body.dark .bg-white { background-color: #2d2d2d !important; }
-        body.dark .bg-gray-50 { background-color: #252525 !important; }
-        body.dark .border { border-color: #404040 !important; }
-        body.dark input { background-color: #3a3a3a; color: #e0e0e0; border-color: #505050; }
-        img, video { max-width: 100%; border-radius: 12px; max-height: 300px; }
+        body.dark { background:#1a1a1a; color:#e0e0e0; }
+        body.dark .bg-white { background:#2d2d2d !important; }
+        body.dark .bg-gray-50 { background:#252525 !important; }
+        body.dark .border { border-color:#404040 !important; }
+        body.dark input { background:#3a3a3a; color:#e0e0e0; border-color:#505050; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -19,30 +18,25 @@
 <div id="authScreen" class="min-h-screen flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold tracking-tight">Nodi</h1>
+            <h1 class="text-3xl font-bold">Nodi</h1>
             <button onclick="toggleTheme()" class="text-2xl" id="themeBtn">🌙</button>
         </div>
-
         <div id="step1" class="space-y-3">
             <input type="email" id="regEmail" placeholder="Email" class="w-full border rounded-xl p-3">
             <button onclick="sendCode()" class="w-full bg-black text-white py-3 rounded-xl font-semibold">Получить код</button>
         </div>
-
         <div id="step2" class="hidden space-y-3">
             <input type="text" id="code" placeholder="Код из письма" class="w-full border rounded-xl p-3">
             <input type="text" id="regNick" placeholder="Никнейм" class="w-full border rounded-xl p-3">
             <input type="password" id="regPass" placeholder="Пароль" class="w-full border rounded-xl p-3">
             <button onclick="register()" class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold">Зарегистрироваться</button>
         </div>
-
         <div class="h-px bg-gray-200 my-4"></div>
-
         <div class="space-y-3">
             <input type="email" id="loginEmail" placeholder="Email" class="w-full border rounded-xl p-3">
             <input type="password" id="loginPass" placeholder="Пароль" class="w-full border rounded-xl p-3">
             <button onclick="login()" class="w-full bg-black text-white py-3 rounded-xl font-semibold">Войти</button>
         </div>
-
         <div id="errorMsg" class="text-red-500 text-center mt-3 text-sm"></div>
     </div>
 </div>
@@ -51,33 +45,23 @@
     <div class="bg-white border-b p-4 flex justify-between items-center">
         <div class="flex items-center gap-3">
             <span class="text-xl font-bold">Nodi</span>
-            <div class="flex items-center gap-1 text-sm text-gray-500">
-                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span id="onlineCount">Загрузка...</span>
-            </div>
+            <span id="onlineCount" class="text-sm text-gray-500">⚫</span>
         </div>
         <div class="flex gap-3">
             <button onclick="toggleTheme()" class="text-xl">🌙</button>
             <button onclick="showCreateChannel()" class="bg-gray-200 px-3 py-1 rounded-full text-sm">➕ Канал</button>
+            <button onclick="showAdminPanel()" id="adminBtn" class="hidden bg-yellow-200 px-3 py-1 rounded-full text-sm">📊 Статистика</button>
             <button onclick="logout()" class="bg-gray-200 px-3 py-1 rounded-full text-sm">🚪 Выйти</button>
         </div>
     </div>
-
     <div class="flex flex-1 overflow-hidden">
-        <div class="w-72 bg-gray-50 border-r p-3 flex flex-col overflow-y-auto">
+        <div class="w-64 bg-gray-50 border-r p-3 flex flex-col overflow-y-auto">
             <div class="mb-4 p-2 bg-gray-100 rounded-lg">
-                <div class="font-medium text-sm" id="myNick"></div>
-                <div class="text-xs text-gray-500" id="myEmail"></div>
-                <div class="text-xs text-green-600 mt-1">● В сети</div>
+                <div class="font-medium" id="myNick"></div>
+                <div class="text-xs text-green-600">● В сети</div>
             </div>
-
-            <div class="mb-3">
-                <input type="text" id="targetUser" placeholder="Кому (ник или slug канала)" class="w-full border rounded-lg p-2 text-sm">
-                <label class="flex items-center gap-2 mt-2 text-sm">
-                    <input type="checkbox" id="isChannel"> Канал
-                </label>
-            </div>
-
+            <input type="text" id="targetUser" placeholder="Кому (ник)" class="w-full border rounded-lg p-2 text-sm mb-2">
+            <label class="flex items-center gap-2 text-sm mb-3"><input type="checkbox" id="isChannel"> Канал</label>
             <div id="channelCreate" class="hidden mb-3">
                 <input type="text" id="channelSlug" placeholder="slug (англ)" class="w-full border rounded-lg p-2 text-sm mb-2">
                 <input type="text" id="channelName" placeholder="Название" class="w-full border rounded-lg p-2 text-sm mb-2">
@@ -87,265 +71,231 @@
                 </select>
                 <button onclick="createChannel()" class="bg-black text-white py-1 rounded-lg text-sm w-full">Создать</button>
             </div>
-
-            <div class="mb-3">
-                <div class="text-xs font-bold text-gray-500 mb-1">📢 Мои каналы</div>
-                <div id="myChannelsList" class="space-y-1 text-sm max-h-32 overflow-y-auto"></div>
-            </div>
-
-            <div id="channelMembersPanel" class="hidden">
-                <div class="text-xs font-bold text-gray-500 mb-1">👥 Участники канала</div>
-                <div id="channelMembersList" class="space-y-1 text-sm max-h-40 overflow-y-auto"></div>
-            </div>
-
             <div class="text-xs text-gray-400 mt-auto pt-3">
-                <p>💬 Личка: ник или email</p>
-                <p>📢 Канал: включите галочку</p>
-                <p>📷 Нажми 📷 для отправки фото</p>
-                <p>🔒 Файлы видны только участникам канала</p>
+                <p>📷 <button onclick="sendImage()" class="text-blue-500">Отправить фото/видео</button></p>
+                <p>👑 Админы назначаются владельцем</p>
             </div>
         </div>
-
         <div class="flex-1 flex flex-col">
             <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
-            <div class="p-4 border-t flex gap-2 items-center">
-                <button onclick="sendImage()" class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-full text-xl transition">📷</button>
+            <div class="p-4 border-t flex gap-2">
                 <input type="text" id="messageInput" placeholder="Сообщение..." class="flex-1 border rounded-full px-4 py-2" onkeypress="if(event.key==='Enter') sendMessage()">
-                <button onclick="sendMessage()" class="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">➤</button>
+                <button onclick="sendMessage()" class="bg-black text-white px-6 rounded-full">➤</button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Модальное окно статистики -->
+<div id="adminModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full">
+        <h3 class="text-xl font-bold mb-3">Статистика сервера</h3>
+        <div id="statsContent">Загрузка...</div>
+        <button onclick="closeAdminPanel()" class="mt-4 bg-gray-300 px-4 py-2 rounded">Закрыть</button>
     </div>
 </div>
 
 <input type="file" id="imageInput" accept="image/*,video/*" class="hidden">
 
 <script>
-let currentToken = null, currentNick = null, currentEmail = null, ws = null, currentEmailForCode = null, currentChannel = null;
+let token=null, nick=null, email=null, ws=null, pendingEmail=null;
 
-function toggleTheme() {
+function toggleTheme(){
     document.body.classList.toggle('dark');
-    localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
-    document.getElementById('themeBtn').textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+    localStorage.setItem('theme',document.body.classList.contains('dark')?'dark':'light');
+    document.getElementById('themeBtn').innerText=document.body.classList.contains('dark')?'☀️':'🌙';
+}
+if(localStorage.getItem('theme')==='dark') toggleTheme();
+
+async function updateOnlineCount(){
+    try{
+        let r=await fetch('/online_count');
+        let d=await r.json();
+        document.getElementById('onlineCount').innerText=`🟢 ${d.count} онлайн`;
+    }catch(e){}
 }
 
-function loadTheme() {
-    if (localStorage.getItem('theme') === 'dark') {
-        document.body.classList.add('dark');
-        document.getElementById('themeBtn').textContent = '☀️';
-    }
+function showError(msg){
+    let e=document.getElementById('errorMsg');
+    e.innerText=msg;
+    setTimeout(()=>e.innerText='',3000);
 }
 
-async function updateOnlineCount() {
-    try {
-        const res = await fetch('/online_count');
-        const data = await res.json();
-        document.getElementById('onlineCount').innerHTML = `${data.count} онлайн`;
-    } catch(e) {}
-}
-
-function showError(msg) {
-    const el = document.getElementById('errorMsg');
-    el.innerText = msg;
-    setTimeout(() => el.innerText = '', 3000);
-}
-
-async function sendCode() {
-    const email = document.getElementById('regEmail').value;
-    if (!email) { showError('Введите email'); return; }
-    currentEmailForCode = email;
-    const fd = new FormData();
-    fd.append('email', email);
-    const res = await fetch('/send_code', {method: 'POST', body: fd});
-    if (res.ok) {
+async function sendCode(){
+    let em=document.getElementById('regEmail').value;
+    if(!em){showError('Введите email');return;}
+    pendingEmail=em;
+    let fd=new FormData(); fd.append('email',em);
+    let r=await fetch('/send_code',{method:'POST',body:fd});
+    if(r.ok){
         document.getElementById('step1').classList.add('hidden');
         document.getElementById('step2').classList.remove('hidden');
-        showError('Код отправлен на почту!');
-    } else showError('Ошибка отправки');
+        showError('Код отправлен на почту');
+    }else showError('Ошибка отправки');
 }
 
-async function register() {
-    const fd = new FormData();
-    fd.append('email', currentEmailForCode);
-    fd.append('nickname', document.getElementById('regNick').value);
-    fd.append('password', document.getElementById('regPass').value);
-    fd.append('code', document.getElementById('code').value);
-    const res = await fetch('/register', {method: 'POST', body: fd});
-    const data = await res.json();
-    if (res.ok) {
-        currentToken = data.token; currentNick = data.nickname; currentEmail = data.email;
-        localStorage.setItem('token', currentToken); localStorage.setItem('nick', currentNick); localStorage.setItem('email', currentEmail);
+async function register(){
+    let code=document.getElementById('code').value;
+    let nn=document.getElementById('regNick').value;
+    let pw=document.getElementById('regPass').value;
+    let fd=new FormData();
+    fd.append('email',pendingEmail); fd.append('nickname',nn); fd.append('password',pw); fd.append('code',code);
+    let r=await fetch('/register',{method:'POST',body:fd});
+    let d=await r.json();
+    if(r.ok){
+        token=d.token; nick=d.nickname; email=pendingEmail;
+        localStorage.setItem('token',token); localStorage.setItem('nick',nick); localStorage.setItem('email',email);
         startChat();
-    } else showError(data.detail);
+    }else showError(d.detail);
 }
 
-async function login() {
-    const fd = new FormData();
-    fd.append('email', document.getElementById('loginEmail').value);
-    fd.append('password', document.getElementById('loginPass').value);
-    const res = await fetch('/login', {method: 'POST', body: fd});
-    const data = await res.json();
-    if (res.ok) {
-        currentToken = data.token; currentNick = data.nickname; currentEmail = data.email;
-        localStorage.setItem('token', currentToken); localStorage.setItem('nick', currentNick); localStorage.setItem('email', currentEmail);
+async function login(){
+    let em=document.getElementById('loginEmail').value;
+    let pw=document.getElementById('loginPass').value;
+    let fd=new FormData(); fd.append('email',em); fd.append('password',pw);
+    let r=await fetch('/login',{method:'POST',body:fd});
+    let d=await r.json();
+    if(r.ok){
+        token=d.token; nick=d.nickname; email=em;
+        localStorage.setItem('token',token); localStorage.setItem('nick',nick); localStorage.setItem('email',email);
         startChat();
-    } else showError(data.detail);
+    }else showError(d.detail);
 }
 
-function startChat() {
+async function startChat(){
     document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('chatScreen').classList.remove('hidden');
-    document.getElementById('myNick').innerText = currentNick;
-    document.getElementById('myEmail').innerText = currentEmail;
-    connectWebSocket();
-    checkInviteLink();
+    document.getElementById('myNick').innerText=nick;
+    connectWS();
     updateOnlineCount();
-    setInterval(updateOnlineCount, 10000);
+    setInterval(updateOnlineCount,10000);
+    checkInvite();
+    checkAdmin();
 }
 
-function connectWebSocket() {
-    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${protocol}://${location.host}/ws/${currentToken}`);
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'history') data.messages.forEach(msg => addMessage(msg.from_nick, msg.text, msg.time, msg.from_nick === currentNick, msg.media_type, msg.filename, msg.channel, msg.is_admin, msg.is_owner));
-        else if (data.type === 'message') addMessage(data.from, data.text, data.time, false, data.media_type, data.filename, data.channel, data.is_admin, data.is_owner);
-        else if (data.type === 'sent') addMessage(currentNick, data.text, new Date().toLocaleTimeString().slice(0,5), true, data.media_type, data.filename, false, false, false);
-        else if (data.type === 'error') showError(data.text);
+async function checkAdmin(){
+    try{
+        let r=await fetch(`/stats?token=${token}`);
+        if(r.ok) document.getElementById('adminBtn').classList.remove('hidden');
+    }catch(e){}
+}
+
+function connectWS(){
+    let proto=location.protocol==='https:'?'wss':'ws';
+    ws=new WebSocket(`${proto}://${location.host}/ws/${token}`);
+    ws.onmessage=e=>{
+        let msg=JSON.parse(e.data);
+        if(msg.type==='error') showError(msg.text);
+        else addMessage(msg.from, msg.text, msg.time, msg.from===nick, msg.is_channel?msg.to:null, msg.media_type, msg.filename);
     };
-    ws.onclose = () => setTimeout(connectWebSocket, 3000);
+    ws.onclose=()=>setTimeout(connectWS,3000);
 }
 
-function addMessage(sender, content, time, isMe, mediaType, filename, isChannel, isAdmin, isOwner) {
-    const container = document.getElementById('messages');
-    const div = document.createElement('div');
-    div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
-    let contentHtml = '', senderHtml = sender;
-    if (isChannel) {
-        if (isOwner) senderHtml = `👑⭐ ${sender} (создатель)`;
-        else if (isAdmin) senderHtml = `👑 ${sender} (админ)`;
-        else senderHtml = `📢 ${sender}`;
-    }
-    if (mediaType === 'image') {
-        contentHtml = `<img src="${content}" class="rounded-lg mt-1 max-h-64 object-cover" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=Ошибка'">`;
-        if (filename) contentHtml += `<div class="text-[10px] opacity-50 mt-1">📷 ${filename}</div>`;
-        contentHtml += `<div class="text-[8px] text-gray-400 mt-0.5">🔒 Приватная ссылка</div>`;
-    } else if (mediaType === 'video') {
-        contentHtml = `<video src="${content}" controls class="rounded-lg mt-1 max-h-64"></video>`;
-        contentHtml += `<div class="text-[8px] text-gray-400 mt-0.5">🔒 Приватная ссылка</div>`;
-    } else contentHtml = `<div>${escapeHtml(content)}</div>`;
-    div.innerHTML = `<div class="${isMe ? 'bg-gray-800 text-white' : 'bg-gray-200'} rounded-2xl px-4 py-2 max-w-xs break-words"><div class="text-xs opacity-75 mb-1">${escapeHtml(senderHtml)}</div>${contentHtml}<div class="text-[10px] text-right mt-1 opacity-50">${time}</div></div>`;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+function addMessage(sender,text,time,isMe,channel,mediaType,filename){
+    let div=document.createElement('div');
+    div.className=`flex ${isMe?'justify-end':'justify-start'} mb-2`;
+    let prefix=channel?`📢 ${sender}`:sender;
+    let contentHtml='';
+    if(mediaType==='image') contentHtml=`<img src="${text}" class="rounded-lg max-h-64 mt-1">`;
+    else if(mediaType==='video') contentHtml=`<video src="${text}" controls class="rounded-lg max-h-64 mt-1"></video>`;
+    else contentHtml=`<div>${escapeHtml(text)}</div>`;
+    if(filename && mediaType) contentHtml+=`<div class="text-[10px] opacity-50 mt-1">${mediaType==='image'?'📷':'🎥'} ${escapeHtml(filename)}</div>`;
+    div.innerHTML=`<div class="${isMe?'bg-gray-800 text-white':'bg-gray-200'} rounded-2xl px-4 py-2 max-w-xs"><div class="text-xs opacity-75">${escapeHtml(prefix)}</div>${contentHtml}<div class="text-[10px] text-right mt-1">${time}</div></div>`;
+    document.getElementById('messages').appendChild(div);
+    document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;
 }
 
-function sendMessage() {
-    const text = document.getElementById('messageInput').value;
-    const target = document.getElementById('targetUser').value;
-    const isChannel = document.getElementById('isChannel').checked;
-    if (!text.trim() || !target.trim()) { showError('Укажите получателя и сообщение'); return; }
-    ws.send(JSON.stringify({type: 'message', to: target, text: text, is_channel: isChannel}));
-    document.getElementById('messageInput').value = '';
+function sendMessage(){
+    let text=document.getElementById('messageInput').value;
+    let target=document.getElementById('targetUser').value;
+    let isChan=document.getElementById('isChannel').checked;
+    if(!text.trim()||!target.trim()) return;
+    ws.send(JSON.stringify({type:'message',to:target,text:text,is_channel:isChan}));
+    document.getElementById('messageInput').value='';
 }
 
-async function sendImage() {
-    const fileInput = document.getElementById('imageInput');
+async function sendImage(){
+    let fileInput=document.getElementById('imageInput');
     fileInput.click();
-    fileInput.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const target = document.getElementById('targetUser').value;
-        const isChannel = document.getElementById('isChannel').checked;
-        if (!target.trim()) { showError('Укажите получателя'); return; }
-        showError('📤 Загрузка...');
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('token', currentToken);
-        if (isChannel) fd.append('channel_slug', target);
-        const res = await fetch('/upload_media', {method: 'POST', body: fd});
-        const data = await res.json();
-        if (res.ok) {
-            ws.send(JSON.stringify({type: 'message', to: target, text: '', media_url: data.url, media_type: data.type, filename: data.filename, is_channel: isChannel}));
-            showError('✅ Отправлено! Ссылка активна 30 минут');
-        } else showError('Ошибка: ' + (data.detail || 'неизвестно'));
-        fileInput.value = '';
+    fileInput.onchange=async (e)=>{
+        let file=e.target.files[0];
+        if(!file) return;
+        let target=document.getElementById('targetUser').value;
+        let isChan=document.getElementById('isChannel').checked;
+        if(!target.trim()){showError('Укажите получателя');return;}
+        let fd=new FormData();
+        fd.append('file',file);
+        fd.append('token',token);
+        let r=await fetch('/upload_media',{method:'POST',body:fd});
+        let data=await r.json();
+        if(r.ok){
+            ws.send(JSON.stringify({type:'message',to:target,text:'',media_url:data.url,media_type:data.type,filename:data.filename,is_channel:isChan}));
+        }else showError(data.detail);
+        fileInput.value='';
     };
 }
 
-function showCreateChannel() { document.getElementById('channelCreate').classList.toggle('hidden'); }
+function showCreateChannel(){
+    document.getElementById('channelCreate').classList.toggle('hidden');
+}
 
-async function createChannel() {
-    const slug = document.getElementById('channelSlug').value;
-    const name = document.getElementById('channelName').value;
-    const writePermission = document.getElementById('channelWritePermission').value;
-    if (!slug || !name) { showError('Заполните все поля'); return; }
-    const fd = new FormData();
-    fd.append('slug', slug); fd.append('name', name); fd.append('token', currentToken); fd.append('write_permission', writePermission);
-    const res = await fetch('/create_channel', {method: 'POST', body: fd});
-    const data = await res.json();
-    if (res.ok) {
-        alert(`Канал создан! Ссылка: ${location.origin}/?join=${data.slug}`);
+async function createChannel(){
+    let slug=document.getElementById('channelSlug').value;
+    let name=document.getElementById('channelName').value;
+    let perm=document.getElementById('channelWritePermission').value;
+    let fd=new FormData(); fd.append('slug',slug); fd.append('name',name); fd.append('token',token); fd.append('write_permission',perm);
+    let r=await fetch('/create_channel',{method:'POST',body:fd});
+    let d=await r.json();
+    if(r.ok){
+        alert(`Канал создан! Ссылка: ${location.origin}/?join=${d.slug}`);
         document.getElementById('channelCreate').classList.add('hidden');
-        location.reload();
-    } else alert(data.detail);
+    }else alert(d.detail);
 }
 
-async function selectChannel(slug) {
-    currentChannel = slug;
-    document.getElementById('targetUser').value = slug;
-    document.getElementById('isChannel').checked = true;
-    const fd = new FormData();
-    fd.append('slug', slug); fd.append('token', currentToken);
-    const res = await fetch('/get_channel_members', {method: 'POST', body: fd});
-    const data = await res.json();
-    if (res.ok) {
-        document.getElementById('channelMembersPanel').classList.remove('hidden');
-        const container = document.getElementById('channelMembersList');
-        container.innerHTML = '';
-        data.members.forEach(member => {
-            const isAdmin = data.admins.includes(member.token);
-            const isOwner = member.token === data.owner_token;
-            const div = document.createElement('div');
-            div.className = 'flex justify-between items-center p-1 hover:bg-gray-100 rounded text-xs';
-            div.innerHTML = `<div class="flex items-center gap-1">${isOwner ? '👑⭐' : (isAdmin ? '👑' : '👤')} ${escapeHtml(member.nickname)}</div>`;
-            container.appendChild(div);
-        });
-        const channelsContainer = document.getElementById('myChannelsList');
-        let hasChannel = false;
-        for (let i = 0; i < channelsContainer.children.length; i++) {
-            if (channelsContainer.children[i].innerText.includes(slug)) hasChannel = true;
-        }
-        if (!hasChannel) {
-            const channelDiv = document.createElement('div');
-            channelDiv.className = 'flex justify-between items-center p-1 hover:bg-gray-100 rounded cursor-pointer';
-            channelDiv.onclick = () => selectChannel(slug);
-            channelDiv.innerHTML = `<span>${data.write_permission === 'admin' ? '👑' : '✍️'} ${slug}</span>`;
-            channelsContainer.appendChild(channelDiv);
-        }
+async function checkInvite(){
+    let p=new URLSearchParams(location.search);
+    let join=p.get('join');
+    if(join && token){
+        let fd=new FormData(); fd.append('slug',join); fd.append('token',token);
+        await fetch('/join_channel',{method:'POST',body:fd});
+        document.getElementById('targetUser').value=join;
+        document.getElementById('isChannel').checked=true;
+        history.pushState({},'',location.pathname);
     }
 }
 
-async function checkInviteLink() {
-    const params = new URLSearchParams(window.location.search);
-    const joinSlug = params.get('join');
-    if (joinSlug && currentToken) {
-        const fd = new FormData();
-        fd.append('slug', joinSlug); fd.append('token', currentToken);
-        await fetch('/join_channel', {method: 'POST', body: fd});
-        await selectChannel(joinSlug);
-        history.pushState({}, '', '/');
-        showError(`✅ Вы вступили в канал ${joinSlug}`);
-    }
+async function showAdminPanel(){
+    let r=await fetch(`/stats?token=${token}`);
+    if(r.ok){
+        let data=await r.json();
+        document.getElementById('statsContent').innerHTML=`
+            <p>👥 Всего пользователей: ${data.total_users}</p>
+            <p>💬 Всего сообщений: ${data.total_messages}</p>
+            <p>📢 Всего каналов: ${data.total_channels}</p>
+        `;
+        document.getElementById('adminModal').classList.remove('hidden');
+    }else alert('Нет прав');
 }
 
-function logout() { localStorage.clear(); if (ws) ws.close(); location.reload(); }
-function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+function closeAdminPanel(){
+    document.getElementById('adminModal').classList.add('hidden');
+}
 
-loadTheme();
-const savedToken = localStorage.getItem('token');
-const savedNick = localStorage.getItem('nick');
-const savedEmail = localStorage.getItem('email');
-if (savedToken && savedNick && savedEmail) {
-    currentToken = savedToken; currentNick = savedNick; currentEmail = savedEmail;
+function logout(){
+    localStorage.clear();
+    if(ws) ws.close();
+    location.reload();
+}
+
+function escapeHtml(s){
+    let div=document.createElement('div');
+    div.textContent=s;
+    return div.innerHTML;
+}
+
+let savedToken=localStorage.getItem('token'), savedNick=localStorage.getItem('nick'), savedEmail=localStorage.getItem('email');
+if(savedToken && savedNick && savedEmail){
+    token=savedToken; nick=savedNick; email=savedEmail;
     startChat();
 }
 </script>
