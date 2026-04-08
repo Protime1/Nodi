@@ -296,7 +296,7 @@ async def transfer_ownership(channel_slug: str = Form(...), new_owner_nickname: 
 async def online_count():
     return {"count": len(active_connections)}
 
-@app.get("/stats")
+@app.get("/stats", response_model=None)
 async def stats(token: str, db: Session = SessionLocal()):
     user = db.query(User).filter(User.token == token).first()
     if not user or not user.is_global_admin:
