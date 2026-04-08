@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nodi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body.dark { background-color: #1a1a1a; color: #e0e0e0; }
+        body.dark .bg-white { background-color: #2d2d2d !important; }
+        body.dark .bg-gray-50 { background-color: #252525 !important; }
+        body.dark .border { border-color: #404040 !important; }
+        body.dark input { background-color: #3a3a3a; color: #e0e0e0; border-color: #505050; }
+        img, video { max-width: 100%; border-radius: 12px; max-height: 300px; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+<div id="authScreen" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold tracking-tight">Nodi</h1>
+            <button onclick="toggleTheme()" class="text-2xl" id="themeBtn">🌙</button>
+        </div>
+
+        <div id="step1" class="space-y-3">
+            <input type="email" id="regEmail" placeholder="Email" class="w-full border rounded-xl p-3">
+            <button onclick="sendCode()" class="w-full bg-black text-white py-3 rounded-xl font-semibold">Получить код</button>
+        </div>
+
+        <div id="step2" class="hidden space-y-3">
+            <input type="text" id="code" placeholder="Код из письма" class="w-full border rounded-xl p-3">
+            <input type="text" id="regNick" placeholder="Никнейм" class="w-full border rounded-xl p-3">
+            <input type="password" id="regPass" placeholder="Пароль" class="w-full border rounded-xl p-3">
+            <button onclick="register()" class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold">Зарегистрироваться</button>
+        </div>
+
+        <div class="h-px bg-gray-200 my-4"></div>
+
+        <div class="space-y-3">
+            <input type="email" id="loginEmail" placeholder="Email" class="w-full border rounded-xl p-3">
+            <input type="password" id="loginPass" placeholder="Пароль" class="w-full border rounded-xl p-3">
+            <button onclick="login()" class="w-full bg-black text-white py-3 rounded-xl font-semibold">Войти</button>
+        </div>
+
+        <div id="errorMsg" class="text-red-500 text-center mt-3 text-sm"></div>
+    </div>
+</div>
+
+<div id="chatScreen" class="hidden h-screen flex flex-col">
+    <div class="bg-white border-b p-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <span class="text-xl font-bold">Nodi</span>
+            <div class="flex items-center gap-1 text-sm text-gray-500">
+                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span id="onlineCount">Загрузка...</span>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="toggleTheme()" class="text-xl">🌙</button>
+            <button onclick="showCreateChannel()" class="bg-gray-200 px-3 py-1 rounded-full text-sm">➕ Канал</button>
+            <button onclick="logout()" class="bg-gray-200 px-3 py-1 rounded-full text-sm">🚪 Выйти</button>
+        </div>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+        <div class="w-72 bg-gray-50 border-r p-3 flex flex-col overflow-y-auto">
+            <div class="mb-4 p-2 bg-gray-100 rounded-lg">
+                <div class="font-medium text-sm" id="myNick"></div>
+                <div class="text-xs text-gray-500" id="myEmail"></div>
+                <div class="text-xs text-green-600 mt-1">● В сети</div>
+            </div>
+
+            <div class="mb-3">
+                <input type="text" id="targetUser" placeholder="Кому (ник или slug канала)" class="w-full border rounded-lg p-2 text-sm">
+                <label class="flex items-center gap-2 mt-2 text-sm">
+                    <input type="checkbox" id="isChannel"> Канал
+                </label>
+            </div>
+
+            <div id="channelCreate" class="hidden mb-3">
+                <input type="text" id="channelSlug" placeholder="slug (англ)" class="w-full border rounded-lg p-2 text-sm mb-2">
+                <input type="text" id="channelName" placeholder="Название" class="w-full border rounded-lg p-2 text-sm mb-2">
+                <select id="channelWritePermission" class="w-full border rounded-lg p-2 text-sm mb-2">
+                    <option value="all">✍️ Все могут писать</option>
+                    <option value="admin">👑 Только админы</option>
+                </select>
+                <button onclick="createChannel()" class="bg-black text-white py-1 rounded-lg text-sm w-full">Создать</button>
+            </div>
+
+            <div class="mb-3">
+                <div class="text-xs font-bold text-gray-500 mb-1">📢 Мои каналы</div>
+                <div id="myChannelsList" class="space-y-1 text-sm max-h-32 overflow-y-auto"></div>
+            </div>
+
+            <div id="channelMembersPanel" class="hidden">
+                <div class="text-xs font-bold text-gray-500 mb-1">👥 Участники канала</div>
+                <div id="channelMembersList" class="space-y-1 text-sm max-h-40 overflow-y-auto"></div>
+            </div>
+
+            <div class="text-xs text-gray-400 mt-auto pt-3">
+                <p>💬 Личка: ник или email</p>
+                <p>📢 Канал: включите галочку</p>
+                <p>📷 Нажми 📷 для отправки фото</p>
+                <p>🔒 Файлы видны только участникам канала</p>
+            </div>
+        </div>
+
+        <div class="flex-1 flex flex-col">
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+            <div class="p-4 border-t flex gap-2 items-center">
+                <button onclick="sendImage()" class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-full text-xl transition">📷</button>
+                <input type="text" id="messageInput" placeholder="Сообщение..." class="flex-1 border rounded-full px-4 py-2" onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()" class="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">➤</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="imageInput" accept="image/*,video/*" class="hidden">
+
+<script>
+let currentToken = null, currentNick = null, currentEmail = null, ws = null, currentEmailForCode = null, currentChannel = null;
+
+function toggleTheme() {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    document.getElementById('themeBtn').textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+}
+
+function loadTheme() {
+    if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark');
+        document.getElementById('themeBtn').textContent = '☀️';
+    }
+}
+
+async function updateOnlineCount() {
+    try {
+        const res = await fetch('/online_count');
+        const data = await res.json();
+        document.getElementById('onlineCount').innerHTML = `${data.count} онлайн`;
+    } catch(e) {}
+}
+
+function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.innerText = msg;
+    setTimeout(() => el.innerText = '', 3000);
+}
+
+async function sendCode() {
+    const email = document.getElementById('regEmail').value;
+    if (!email) { showError('Введите email'); return; }
+    currentEmailForCode = email;
+    const fd = new FormData();
+    fd.append('email', email);
+    const res = await fetch('/send_code', {method: 'POST', body: fd});
+    if (res.ok) {
+        document.getElementById('step1').classList.add('hidden');
+        document.getElementById('step2').classList.remove('hidden');
+        showError('Код отправлен на почту!');
+    } else showError('Ошибка отправки');
+}
+
+async function register() {
+    const fd = new FormData();
+    fd.append('email', currentEmailForCode);
+    fd.append('nickname', document.getElementById('regNick').value);
+    fd.append('password', document.getElementById('regPass').value);
+    fd.append('code', document.getElementById('code').value);
+    const res = await fetch('/register', {method: 'POST', body: fd});
+    const data = await res.json();
+    if (res.ok) {
+        currentToken = data.token; currentNick = data.nickname; currentEmail = data.email;
+        localStorage.setItem('token', currentToken); localStorage.setItem('nick', currentNick); localStorage.setItem('email', currentEmail);
+        startChat();
+    } else showError(data.detail);
+}
+
+async function login() {
+    const fd = new FormData();
+    fd.append('email', document.getElementById('loginEmail').value);
+    fd.append('password', document.getElementById('loginPass').value);
+    const res = await fetch('/login', {method: 'POST', body: fd});
+    const data = await res.json();
+    if (res.ok) {
+        currentToken = data.token; currentNick = data.nickname; currentEmail = data.email;
+        localStorage.setItem('token', currentToken); localStorage.setItem('nick', currentNick); localStorage.setItem('email', currentEmail);
+        startChat();
+    } else showError(data.detail);
+}
+
+function startChat() {
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('chatScreen').classList.remove('hidden');
+    document.getElementById('myNick').innerText = currentNick;
+    document.getElementById('myEmail').innerText = currentEmail;
+    connectWebSocket();
+    checkInviteLink();
+    updateOnlineCount();
+    setInterval(updateOnlineCount, 10000);
+}
+
+function connectWebSocket() {
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${protocol}://${location.host}/ws/${currentToken}`);
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'history') data.messages.forEach(msg => addMessage(msg.from_nick, msg.text, msg.time, msg.from_nick === currentNick, msg.media_type, msg.filename, msg.channel, msg.is_admin, msg.is_owner));
+        else if (data.type === 'message') addMessage(data.from, data.text, data.time, false, data.media_type, data.filename, data.channel, data.is_admin, data.is_owner);
+        else if (data.type === 'sent') addMessage(currentNick, data.text, new Date().toLocaleTimeString().slice(0,5), true, data.media_type, data.filename, false, false, false);
+        else if (data.type === 'error') showError(data.text);
+    };
+    ws.onclose = () => setTimeout(connectWebSocket, 3000);
+}
+
+function addMessage(sender, content, time, isMe, mediaType, filename, isChannel, isAdmin, isOwner) {
+    const container = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
+    let contentHtml = '', senderHtml = sender;
+    if (isChannel) {
+        if (isOwner) senderHtml = `👑⭐ ${sender} (создатель)`;
+        else if (isAdmin) senderHtml = `👑 ${sender} (админ)`;
+        else senderHtml = `📢 ${sender}`;
+    }
+    if (mediaType === 'image') {
+        contentHtml = `<img src="${content}" class="rounded-lg mt-1 max-h-64 object-cover" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=Ошибка'">`;
+        if (filename) contentHtml += `<div class="text-[10px] opacity-50 mt-1">📷 ${filename}</div>`;
+        contentHtml += `<div class="text-[8px] text-gray-400 mt-0.5">🔒 Приватная ссылка</div>`;
+    } else if (mediaType === 'video') {
+        contentHtml = `<video src="${content}" controls class="rounded-lg mt-1 max-h-64"></video>`;
+        contentHtml += `<div class="text-[8px] text-gray-400 mt-0.5">🔒 Приватная ссылка</div>`;
+    } else contentHtml = `<div>${escapeHtml(content)}</div>`;
+    div.innerHTML = `<div class="${isMe ? 'bg-gray-800 text-white' : 'bg-gray-200'} rounded-2xl px-4 py-2 max-w-xs break-words"><div class="text-xs opacity-75 mb-1">${escapeHtml(senderHtml)}</div>${contentHtml}<div class="text-[10px] text-right mt-1 opacity-50">${time}</div></div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function sendMessage() {
+    const text = document.getElementById('messageInput').value;
+    const target = document.getElementById('targetUser').value;
+    const isChannel = document.getElementById('isChannel').checked;
+    if (!text.trim() || !target.trim()) { showError('Укажите получателя и сообщение'); return; }
+    ws.send(JSON.stringify({type: 'message', to: target, text: text, is_channel: isChannel}));
+    document.getElementById('messageInput').value = '';
+}
+
+async function sendImage() {
+    const fileInput = document.getElementById('imageInput');
+    fileInput.click();
+    fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const target = document.getElementById('targetUser').value;
+        const isChannel = document.getElementById('isChannel').checked;
+        if (!target.trim()) { showError('Укажите получателя'); return; }
+        showError('📤 Загрузка...');
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('token', currentToken);
+        if (isChannel) fd.append('channel_slug', target);
+        const res = await fetch('/upload_media', {method: 'POST', body: fd});
+        const data = await res.json();
+        if (res.ok) {
+            ws.send(JSON.stringify({type: 'message', to: target, text: '', media_url: data.url, media_type: data.type, filename: data.filename, is_channel: isChannel}));
+            showError('✅ Отправлено! Ссылка активна 30 минут');
+        } else showError('Ошибка: ' + (data.detail || 'неизвестно'));
+        fileInput.value = '';
+    };
+}
+
+function showCreateChannel() { document.getElementById('channelCreate').classList.toggle('hidden'); }
+
+async function createChannel() {
+    const slug = document.getElementById('channelSlug').value;
+    const name = document.getElementById('channelName').value;
+    const writePermission = document.getElementById('channelWritePermission').value;
+    if (!slug || !name) { showError('Заполните все поля'); return; }
+    const fd = new FormData();
+    fd.append('slug', slug); fd.append('name', name); fd.append('token', currentToken); fd.append('write_permission', writePermission);
+    const res = await fetch('/create_channel', {method: 'POST', body: fd});
+    const data = await res.json();
+    if (res.ok) {
+        alert(`Канал создан! Ссылка: ${location.origin}/?join=${data.slug}`);
+        document.getElementById('channelCreate').classList.add('hidden');
+        location.reload();
+    } else alert(data.detail);
+}
+
+async function selectChannel(slug) {
+    currentChannel = slug;
+    document.getElementById('targetUser').value = slug;
+    document.getElementById('isChannel').checked = true;
+    const fd = new FormData();
+    fd.append('slug', slug); fd.append('token', currentToken);
+    const res = await fetch('/get_channel_members', {method: 'POST', body: fd});
+    const data = await res.json();
+    if (res.ok) {
+        document.getElementById('channelMembersPanel').classList.remove('hidden');
+        const container = document.getElementById('channelMembersList');
+        container.innerHTML = '';
+        data.members.forEach(member => {
+            const isAdmin = data.admins.includes(member.token);
+            const isOwner = member.token === data.owner_token;
+            const div = document.createElement('div');
+            div.className = 'flex justify-between items-center p-1 hover:bg-gray-100 rounded text-xs';
+            div.innerHTML = `<div class="flex items-center gap-1">${isOwner ? '👑⭐' : (isAdmin ? '👑' : '👤')} ${escapeHtml(member.nickname)}</div>`;
+            container.appendChild(div);
+        });
+        const channelsContainer = document.getElementById('myChannelsList');
+        let hasChannel = false;
+        for (let i = 0; i < channelsContainer.children.length; i++) {
+            if (channelsContainer.children[i].innerText.includes(slug)) hasChannel = true;
+        }
+        if (!hasChannel) {
+            const channelDiv = document.createElement('div');
+            channelDiv.className = 'flex justify-between items-center p-1 hover:bg-gray-100 rounded cursor-pointer';
+            channelDiv.onclick = () => selectChannel(slug);
+            channelDiv.innerHTML = `<span>${data.write_permission === 'admin' ? '👑' : '✍️'} ${slug}</span>`;
+            channelsContainer.appendChild(channelDiv);
+        }
+    }
+}
+
+async function checkInviteLink() {
+    const params = new URLSearchParams(window.location.search);
+    const joinSlug = params.get('join');
+    if (joinSlug && currentToken) {
+        const fd = new FormData();
+        fd.append('slug', joinSlug); fd.append('token', currentToken);
+        await fetch('/join_channel', {method: 'POST', body: fd});
+        await selectChannel(joinSlug);
+        history.pushState({}, '', '/');
+        showError(`✅ Вы вступили в канал ${joinSlug}`);
+    }
+}
+
+function logout() { localStorage.clear(); if (ws) ws.close(); location.reload(); }
+function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+loadTheme();
+const savedToken = localStorage.getItem('token');
+const savedNick = localStorage.getItem('nick');
+const savedEmail = localStorage.getItem('email');
+if (savedToken && savedNick && savedEmail) {
+    currentToken = savedToken; currentNick = savedNick; currentEmail = savedEmail;
+    startChat();
+}
+</script>
+</body>
+</html>
